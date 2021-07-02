@@ -42,10 +42,10 @@ end
 # ╔═╡ 57acf85e-ed59-45b1-b156-bbc28a3f3908
 begin
 	struct Restriction{T,N,R} <: AbstractMatrix{T} where {R<:NTuple{N,<:AbstractUnitRange}}
-		# indices
-		row::R
-		# ranges
-		col::NTuple{N,Int}
+		# Row space
+		ranges::R
+		# Column space
+		dims::NTuple{N,Int}
 	end
 
 	Restriction{T}(x::NTuple{N}...) where {T,N} =
@@ -53,61 +53,69 @@ begin
 end
 
 # ╔═╡ ba130356-61c2-43f6-a060-21576216ffa8
-Base.get(A::Restriction) = A.row, A.col
+flatten(A::Restriction) = A.ranges, A.dims
 
 # ╔═╡ 55b84b1e-20e1-4494-8f0b-6cdcad4c4cfc
 function Base.size(A::Restriction)
-	row, col = get(A)
-	prod(length.(row)), prod(col)
+	ranges, dims = flatten(A)
+	prod(length.(ranges)), prod(dims)
 end
+
+# ╔═╡ 64e45c5b-b7b2-495d-8753-68dfb388192b
+import Base.OneTo, Base.ReshapedArray
 
 # ╔═╡ 3c685005-e25d-4249-aa2b-c9146509982d
 function Base.getindex(A::Restriction, i, j)
-	row, col = get(A)
+	ranges, dims = flatten(A)
 
-	CIrow = reshape(CartesianIndices(row), prod(length.(row)))[i]
-	CIcol = reshape(CartesianIndices(Base.OneTo.(col)), prod(col))[j]
+	row = reshape(CartesianIndices(ranges), prod(length.(ranges)))[i]
+	col = reshape(CartesianIndices(OneTo.(dims)), prod(dims))[j]
 
-	CIrow == CIcol ? one(eltype(A)) : zero(eltype(A))
+	row == col ? one(eltype(A)) : zero(eltype(A))
 end
 
 # ╔═╡ f8f2e4a7-98df-493c-9ad8-bca55deb5550
 function LinearAlgebra.:*(A::Restriction, x::AbstractVector)
-	row, col = get(A)
+	ranges, dims = flatten(A)
+	y = similar(x, prod(length.(ranges)))
+	mul!(y, A, x)
+end
 
-	y = similar(x, prod(length.(row)))
+# ╔═╡ 8af17c38-8b86-4de2-aa73-7b1f3c9ac007
+function LinearAlgebra.mul!(y::AbstractVector, A::Restriction, x::AbstractVector)
+	ranges, dims = flatten(A)
 
-	x̄ = reshape(x, col)
-	ȳ = reshape(y, length.(row))
+	x̄ = ReshapedArray(x, dims, ())
+	ȳ = ReshapedArray(y, length.(ranges), ())
 
-	ȳ .= view(x̄, row...)
+	ȳ .= view(x̄, ranges...)
 
 	y
 end
 
-# ╔═╡ 20d861f4-c3a0-4165-a54d-6bc11c0cfa1c
-# the in-place versions should remove all allocation, no?
+# ╔═╡ fed28d89-39ef-43ae-88e4-bd3818b3df0a
+ranges = (2:3, 5:7)
+
+# ╔═╡ 8a925d91-5fd7-4a5b-beb7-e4553693f14c
+dims = (4, 8)
 
 # ╔═╡ 2cb731e1-29f2-41cd-bd70-99f846740639
-A = Restriction{Float64}((2:3, 5:7), (4, 8))
+A = Restriction{Float64}(ranges, dims)
 
 # ╔═╡ 38629dee-09fe-475e-adc4-e422f941de0d
-x = rand(32)
+x = rand(prod(dims))
+
+# ╔═╡ 8d0bdf18-abeb-4f67-b1ad-5703d31102b6
+y = similar(x, prod(length.(ranges)))
 
 # ╔═╡ aa3b3e49-9d47-4002-a703-124cab55d133
-collect(A) * x == A * x
+collect(A) * x == mul!(y, A, x) == A * x
 
-# ╔═╡ 81f3b678-3604-4d78-8c0c-9326b440ec4d
-test(A, x) = collect(A) * x
+# ╔═╡ c4967239-69a5-43b1-b992-ae118c55b46c
+@btime (*)($A, $x)
 
-# ╔═╡ 9a376926-5ed0-4588-bbd0-e37a708bd46a
-@btime test($A, $x)
-
-# ╔═╡ cffc4619-26b6-459c-bcb8-26a301fb2d86
-test2(A, x) = A * x
-
-# ╔═╡ 7706e0d4-a137-40ca-9531-2b359a004b6b
-@btime test2($A, $x)
+# ╔═╡ 0b0ff2b0-d99e-47b1-b065-e5e0df2f13ca
+@btime mul!($y, $A, $x)
 
 # ╔═╡ 8a97eac0-b795-4181-84e3-434cb380c609
 """
@@ -192,17 +200,19 @@ Base.IteratorsMD.CartesianPartition
 # ╠═57acf85e-ed59-45b1-b156-bbc28a3f3908
 # ╠═ba130356-61c2-43f6-a060-21576216ffa8
 # ╠═55b84b1e-20e1-4494-8f0b-6cdcad4c4cfc
+# ╠═64e45c5b-b7b2-495d-8753-68dfb388192b
 # ╠═3c685005-e25d-4249-aa2b-c9146509982d
 # ╠═f8f2e4a7-98df-493c-9ad8-bca55deb5550
-# ╠═20d861f4-c3a0-4165-a54d-6bc11c0cfa1c
+# ╠═8af17c38-8b86-4de2-aa73-7b1f3c9ac007
+# ╠═fed28d89-39ef-43ae-88e4-bd3818b3df0a
+# ╠═8a925d91-5fd7-4a5b-beb7-e4553693f14c
 # ╠═2cb731e1-29f2-41cd-bd70-99f846740639
 # ╠═38629dee-09fe-475e-adc4-e422f941de0d
+# ╠═8d0bdf18-abeb-4f67-b1ad-5703d31102b6
 # ╠═aa3b3e49-9d47-4002-a703-124cab55d133
 # ╠═fb25196c-0c33-47a7-8492-12deacf02d5e
-# ╠═81f3b678-3604-4d78-8c0c-9326b440ec4d
-# ╠═9a376926-5ed0-4588-bbd0-e37a708bd46a
-# ╠═cffc4619-26b6-459c-bcb8-26a301fb2d86
-# ╠═7706e0d4-a137-40ca-9531-2b359a004b6b
+# ╠═c4967239-69a5-43b1-b992-ae118c55b46c
+# ╠═0b0ff2b0-d99e-47b1-b065-e5e0df2f13ca
 # ╠═8a97eac0-b795-4181-84e3-434cb380c609
 # ╟─dae546eb-978a-4a07-8b71-21cfd6f05e35
 # ╠═888afb10-3648-4960-bf1b-bfb848125f49

@@ -205,6 +205,11 @@ struct Mask{T,N,R<:NTuple{N}} <: AbstractMatrix{T}
 	dims::NTuple{N,Int}
 end
 
+# ╔═╡ a47400cd-dc3b-4d1b-9791-03b21fa6edd1
+function LinearAlgebra.:*(::Extension, ::Restriction)
+	"coucou"
+end
+
 # ╔═╡ 2c5576a4-f369-4a9f-bbef-3028173949b3
 function test(::Type{Mask};
 		ranges = (2:3, 5:7),
@@ -225,7 +230,7 @@ end
 
 # ╔═╡ 446a7c1c-c597-424d-9deb-c30d9ae7dc72
 md"""
-# Multi-diagonal matrices
+# Square matrices
 
 """
 
@@ -237,14 +242,35 @@ md"""
 
 """
 
+# ╔═╡ bdeaf053-5229-4d0b-b3f3-bdb184e092ee
+md"""
+## Local *Dirichlet* matrices
+
+```math
+A_i = R_i A R_i ^ T.
+```
+
+"""
+
+# ╔═╡ 84a871e4-cac6-4af4-90bf-ab829ca2cdf6
+struct DirichletLaplacian end
+
+# ╔═╡ f6a0156a-0eeb-4472-968b-8c9357a3af60
+Aᵢ = DirichletLaplacian()
+
+# ╔═╡ 87319098-bef1-4f3c-add0-e82598623152
+struct Temp end
+
 # ╔═╡ edb9a561-1095-4fc5-a5ce-b30aec943fdb
 function test(ranges = (2:3, 5:7), dims = (4, 8))
 
 	R = restriction(Float64, ranges, dims)
 	Rᵀ = extension(Float64, ranges, dims)
+	A = Temp()
 	x = rand(prod(dims))
 
-	Rᵀ * R
+	#Rᵀ * R
+	R * A * Rᵀ
 end
 
 # ╔═╡ 0595da82-4241-4c4f-ba59-06d3214c47df
@@ -256,13 +282,48 @@ test(Extension)
 # ╔═╡ 86d3fcd3-fb66-431c-b883-52b73210a95e
 test(Mask)
 
-# ╔═╡ a47400cd-dc3b-4d1b-9791-03b21fa6edd1
-function LinearAlgebra.:*(::Extension, ::Restriction)
-	"coucou"
-end
-
 # ╔═╡ cc62cfe8-9f53-4013-a1ca-4a637ec124e3
 test()
+
+# ╔═╡ 63ac55a3-8c8a-497c-bd13-78575871cc6e
+function LinearAlgebra.:*(::Restriction, ::Temp, ::Extension)
+	"Tri/Penta/Hepta-diagonal"
+end
+
+# ╔═╡ 3b27b178-d53f-4f33-a3f7-5824f94860ad
+md"""
+Partition of unity reads
+```math
+I = \sum_i R _ i ^ T D _ i R _ i.
+```
+
+Multiplying by ``A`` on the right,
+```math
+A = \sum_i R _ i ^ T D _ i R _ i A.
+```
+
+"""
+
+# ╔═╡ 7073f461-ff16-4d54-af86-940076423c72
+md"""
+!!! tip "Ghost nodes"
+
+	No need for ghost nodes! ``D_i`` just needs to vanish over the width of the stencil, that's all!
+
+	The overlap should therefore be greater or equal to twice the stencil width.
+
+If this is satisfied, it can be shown that
+```math
+D_i R_i A = D_i A_i R_i.
+```
+
+We therefore find that
+```math
+A = \sum_i R _ i ^ T D _ i R _ i A = \sum_i R _ i ^ T D _ i A_i R_i.
+```
+
+Since only ``V_i = R_i V`` is available locally,
+"""
 
 # ╔═╡ 669b08df-fa43-46da-97a0-68d735831548
 md"""
@@ -314,10 +375,17 @@ Base.IteratorsMD.CartesianPartition
 # ╠═a47400cd-dc3b-4d1b-9791-03b21fa6edd1
 # ╠═2c5576a4-f369-4a9f-bbef-3028173949b3
 # ╠═86d3fcd3-fb66-431c-b883-52b73210a95e
-# ╟─446a7c1c-c597-424d-9deb-c30d9ae7dc72
+# ╠═446a7c1c-c597-424d-9deb-c30d9ae7dc72
 # ╠═5f7456b6-e92a-4004-a9a5-e3b2be463bba
 # ╠═edb9a561-1095-4fc5-a5ce-b30aec943fdb
 # ╠═cc62cfe8-9f53-4013-a1ca-4a637ec124e3
+# ╠═bdeaf053-5229-4d0b-b3f3-bdb184e092ee
+# ╠═84a871e4-cac6-4af4-90bf-ab829ca2cdf6
+# ╠═f6a0156a-0eeb-4472-968b-8c9357a3af60
+# ╠═63ac55a3-8c8a-497c-bd13-78575871cc6e
+# ╠═87319098-bef1-4f3c-add0-e82598623152
+# ╠═3b27b178-d53f-4f33-a3f7-5824f94860ad
+# ╠═7073f461-ff16-4d54-af86-940076423c72
 # ╟─669b08df-fa43-46da-97a0-68d735831548
 # ╠═f36d9f36-20bc-48f7-8168-ebf33fc0b721
 # ╠═8ce5963f-0880-41a1-a99f-8155317512b4

@@ -93,8 +93,19 @@ A = spdiagm(-1 => -ones(m-1) , 0 => 2. *ones(m) , 1 => -ones(m-1))
 g = Graph(A)
 initial_partition = create_partition( g , npart )
 g_adj = adjacency_matrix(g ,  Int64 )
+
 inflated_subdomains_indices = map(sd->inflate_subdomain( g_adj , sd ) ,  initial_partition)
 inflated_subdomains = Subdomain.(inflated_subdomains_indices )
+
+# test de la version plus composable
+
+g2 = Graph(A)
+initial_partition2 = create_partition( g2 , npart )
+inflate_with_g2 = inflate_subdomain2( g2 )
+inflated_subdomains_indices2 = map(sd->inflate_with_g2( sd ) ,  initial_partition)
+inflated_subdomains2 = Subdomain.( inflated_subdomains_indices2 )
+
+## comment choisir entre les deux version ci dessus ?? 
 
 # test des fonctions collectiveR_i, D_i etc ...
 println("tests de base")

@@ -88,13 +88,15 @@ m=9
 npart = 3
 A = spdiagm(-1 => -ones(m-1) , 0 => 2. *ones(m) , 1 => -ones(m-1))
 
+# test des fonctions de decomposition de domaines
+
 g = Graph(A)
 initial_partition = create_partition( g , npart )
 g_adj = adjacency_matrix(g ,  Int64 )
 inflated_subdomains_indices = map(sd->inflate_subdomain( g_adj , sd ) ,  initial_partition)
 inflated_subdomains = Subdomain.(inflated_subdomains_indices )
 
-
+# test des fonctions collectiveR_i, D_i etc ...
 println("tests de base")
 subd1 = Subdomain(  [1 ; 2 ; 3 ; 4])
 V1 = zeros(ndof(subd1))
@@ -120,3 +122,12 @@ Di[2] .=  1. ./ Vi[2]
 Vi[1] .= 1.
 Vi[2] .= 1.
 collectiveDi!( Vi , Di )
+
+# Contrainte: les dofs locales et de recouvrement doivent être contigues
+#  On peut garder le stockage distribué des vecteurs sans passer par un vecteur global
+#  Paralléliser le passage au vecteur global pour se faire la main puis
+#
+#  MPI3 fournit les R_i R_j^T
+#
+#
+#

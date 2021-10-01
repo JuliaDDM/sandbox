@@ -42,6 +42,7 @@ Returns the vector of the indices of the subdomain inflated by its direct neighb
 # Example
 g_adj = adjacency_matrix(g ,  Int64 )
 inflated_subdomains = map(sd->inflate_subdomain( g_adj , sd ) ,  initial_partition)
+A MODIFIER POUR ETRE VRAIMENT COMPOSABLE
 """
 function inflate_subdomain( g_adj , subdomain_indices )
     #trouver les voisins

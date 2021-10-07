@@ -71,6 +71,7 @@ function collectiveDi!( Ui::Vector{Vector{Float64}} , Di::Vector{Vector{Float64}
     end
 end
 
+
 ###########################################################################
 #
 #
@@ -105,7 +106,10 @@ inflate_with_g2 = inflate_subdomain2( g2 )
 inflated_subdomains_indices2 = map(sd->inflate_with_g2( sd ) ,  initial_partition)
 inflated_subdomains2 = Subdomain.( inflated_subdomains_indices2 )
 
-## comment choisir entre les deux version ci dessus ?? 
+# ou bien myinflate(indices)(return inflate_subdomain( g_adj ,indices))
+
+
+## comment choisir entre les trois  version ci dessus ??
 
 # test des fonctions collectiveR_i, D_i etc ...
 println("tests de base")

@@ -77,8 +77,8 @@ using SparseArrays , LightGraphs , GraphPlot , Metis , LinearAlgebra , .decompos
 
 mutable struct Subdomain
     loctoglob::Vector{Int64}
-    not_responsible_for::Dict{Int64, Vector{Tuple{Int64, Int64}}} # sdvois -> vecteur de pairs (local number , distant number)
-    responsible_for  # k -> vecteur de pairs ( ivois , klocchezvois )
+    not_responsible_for::Dict{Subdomain, Vector{Tuple{Int64, Int64}}} # sdvois -> vecteur de pairs (local number , distant number)
+    responsible_for_others::Dict{Int64, Vector{Tuple{Subdomain, Int64}}}  # k -> vecteur de pairs ( subdomain_vois , k_loc_chezvois )
 end
 
 function ndof( sbd::Subdomain )
@@ -89,49 +89,74 @@ function not_responsible_for( sbd::Subdomain )
     return sbd.not_responsible_for
 end
 
-function responsible_for( sbd::Subdomain )
-    return sbd.not_responsible_for
+function responsible_for_others( sbd::Subdomain )
+    return sbd.responsible_for_others
 end
 ######################################################
 mutable struct Shared_vector
-    subdomains::Vector{Subdomain}
+    values::Dict{Subdomain, Vector{Float64}}
 end
 
 function subdomains(U::Shared_vector)
-    return U.subdomains
+    return keys(U.values)
 end
+
+function values(  U::Shared_vector , sd::Subdomain  )
+    return U.values[sd]
+end
+
 
 # Phase 2 de update, les non responsables vont chercher les valeurs chez le responsable
 function MakeCoherent( U )
     for sd ∈ subdomains( U )
         for ( sdneigh , numbering ) ∈ not_responsible_for( sd )
-            MakeCoherent( U , sd , sdneigh , numbering )
+            #            MakeCoherent( U , sd , sdneigh , numbering )
+            for (k,l) ∈ numbering
+                values(U,sd)[k] = values(U,sdneigh)[l]
+            end
         end
     end
 end
 
 function MakeCoherent( U , sd , sdneigh , numbering )
     for (k,l) ∈ numbering
-        U(sd)[k] = U(sdneigh)[l]
+        values(U,sd)[k] = values(U,sdneigh)[l]
     end
 end
 
 # il faut reecrire a la main ce cas test avec les nouvelles structures
 # puis tester MakeCoherent
-# 
+#
 
 
 # test des fonctions collectiveR_i, D_i etc ...
 println("tests de base")
-subd1 = Subdomain(  [1 ; 2 ; 3 ; 4])
+
+not_responsible_1 = Dict{Subdomain, Vector{Tuple{Int64, Int64}}}( )
+responsible_for_others_1 = Dict{Int64, Vector{Tuple{Subdomain, Int64}}}()
+
+not_responsible_2 = Dict{Subdomain, Vector{Tuple{Int64, Int64}}}( )
+responsible_for_others_2 = Dict{Int64, Vector{Tuple{Int64, Int64}}}(1 => [] )
+
+subd1 = Subdomain(  [1 ; 2 ; 3 ; 4]  , not_responsible_1 , responsible_for_others_1 )
+subd2 = Subdomain( [4 ; 5 ; 6 ; 7]  , not_responsible_2 , responsible_for_others_2 )
+
+subd2.responsible_for_others[1] = [( subd1 , 4 )]
+subd1.not_responsible_for[subd2] = [(4 , 1)]
+
+
 V1 = zeros(ndof(subd1))
-subd2 = Subdomain( [4 ; 5 ; 6 ; 7])
-V2=zeros(ndof(subd2))
+V2=ones(ndof(subd2))
 U = ones(7)
 Vi = Vector{Vector{Float64}}(undef,2)
 Vi[1] = V1
 Vi[2] = V2
 
+Vshared=   Shared_vector(Dict( subd1 => V1 , subd2 => V2 ))
+
+
+
+MakeCoherent(Vshared)
 
 collectiveRi!( Vi , [subd1 ; subd2] , U  )
 U .= 0.

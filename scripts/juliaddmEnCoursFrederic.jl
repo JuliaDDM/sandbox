@@ -9,6 +9,14 @@ include("decomposition.jl")
 using .decomposition
 
 
+
+mutable struct Subdomain
+    loctoglob::Vector{Int64}
+    not_responsible_for::Dict{Subdomain, Vector{Tuple{Int64, Int64}}} # sdvois -> vecteur de pairs (local number , distant number)
+    responsible_for_others::Dict{Int64, Vector{Tuple{Subdomain, Int64}}}  # k -> vecteur de pairs ( subdomain_vois , k_loc_chezvois )
+end
+
+
 # il faut généraliser le Float64, avoir plus de généralité dans le choix du conteneur de la liste des sous domaines, vecteurs, etc ...
 # tout mettre sous forme de fonction d'accès
 #faire des versions localisees qui seront appelees par les fonctions globales
@@ -74,12 +82,6 @@ end
 
 using SparseArrays , LightGraphs , GraphPlot , Metis , LinearAlgebra , .decomposition
 
-
-mutable struct Subdomain
-    loctoglob::Vector{Int64}
-    not_responsible_for::Dict{Subdomain, Vector{Tuple{Int64, Int64}}} # sdvois -> vecteur de pairs (local number , distant number)
-    responsible_for_others::Dict{Int64, Vector{Tuple{Subdomain, Int64}}}  # k -> vecteur de pairs ( subdomain_vois , k_loc_chezvois )
-end
 
 function ndof( sbd::Subdomain )
     return length(sbd.loctoglob)

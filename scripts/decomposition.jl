@@ -5,7 +5,7 @@
 #################################################
 
 module decomposition
-export create_partition , inflate_subdomain  , inflate_subdomain2
+export create_partition , inflate_subdomain
 
 using SparseArrays , LightGraphs , GraphPlot , Metis , LinearAlgebra
 
@@ -52,26 +52,6 @@ function inflate_subdomain( g_adj , subdomain_indices )
     vi = g_adj*vi
     inflated_subdomain_indices = findall(x->x>0,vi)
     return inflated_subdomain_indices
-end
-
-
-"""
-inflate_subdomain2( g_adj )
-
-Returns the function that enables to inflate a subdomain with its direct neighbors as defined by the adjacency matrix 'g_adj'.
-# Arguments
-- 'g_adj' : the adjacency matrix of the degrees of freedom with non zero on the diagonal (a square matrix)
-# Example
-g_adj = adjacency_matrix(g ,  Int64 )
-inflate_subdomain_with_g_adj = inflate_subdomain2( g_adj )
-inflated_subdomains = map(sd->inflate_subdomain_with_g_adj( sd ) ,  initial_partition)
- voir aussi  inflate_subdomain( sd , g_adj )
-"""
-function inflate_subdomain2( g_adj )
-    function inflate( subdomain_indices )
-        return inflate_subdomain( g_adj , subdomain_indices )
-    end
-    return inflate
 end
 
 end

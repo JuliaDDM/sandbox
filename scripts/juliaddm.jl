@@ -100,6 +100,17 @@ inflated_subdomains = Subdomain.(inflated_subdomains_indices )
 
 # test de la version plus composable
 
+
+function inflate_subdomain2( g_adj )
+    function inflate( subdomain_indices )
+        return inflate_subdomain( g_adj , subdomain_indices )
+    end
+    return inflate
+end
+
+
+
+
 g2 = Graph(A)
 initial_partition2 = create_partition( g2 , npart )
 inflate_with_g2 = inflate_subdomain2( g2 )

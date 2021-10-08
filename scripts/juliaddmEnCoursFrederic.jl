@@ -62,8 +62,6 @@ function collectiveDi!( Ui::Vector{Vector{Float64}} , Di::Vector{Vector{Float64}
         Uloc .*= Dloc
     end
 end
-
-
 ###########################################################################
 #
 #
@@ -75,32 +73,6 @@ end
 ####  tests a partir de decoupage METIS
 
 using SparseArrays , LightGraphs , GraphPlot , Metis , LinearAlgebra , .decomposition
-
-
-m=9
-npart = 3
-A = spdiagm(-1 => -ones(m-1) , 0 => 2. *ones(m) , 1 => -ones(m-1))
-
-# test des fonctions de decomposition de domaines
-
-g = Graph(A)
-initial_partition = create_partition( g , npart )
-g_adj = adjacency_matrix(g ,  Int64 )
-
-inflated_subdomains_indices = map(sd->inflate_subdomain( g_adj , sd ) ,  initial_partition)
-inflated_subdomains = Subdomain.(inflated_subdomains_indices )
-
-# test de la version plus composable
-
-g2 = Graph(A)
-initial_partition2 = create_partition( g2 , npart )
-inflate_with_g2 = inflate_subdomain2( g2 )
-inflated_subdomains_indices2 = map(sd->inflate_with_g2( sd ) ,  initial_partition)
-inflated_subdomains2 = Subdomain.( inflated_subdomains_indices2 )
-
-# ou bien myinflate(indices)(return inflate_subdomain( g_adj ,indices))
-
-# U est un vecteur réparti sur des sous domaines
 
 
 mutable struct Subdomain
@@ -120,11 +92,7 @@ end
 function responsible_for( sbd::Subdomain )
     return sbd.not_responsible_for
 end
-
-
-
 ######################################################
-
 mutable struct Shared_vector
     subdomains::Vector{Subdomain}
 end
@@ -132,7 +100,6 @@ end
 function subdomains(U::Shared_vector)
     return U.subdomains
 end
-
 
 # Phase 2 de update, les non responsables vont chercher les valeurs chez le responsable
 function MakeCoherent( U )
@@ -149,11 +116,10 @@ function MakeCoherent( U , sd , sdneigh , numbering )
     end
 end
 
+# il faut reecrire a la main ce cas test avec les nouvelles structures
+# puis tester MakeCoherent
+# 
 
-
-
-
-## comment choisir entre les trois  version ci dessus ??
 
 # test des fonctions collectiveR_i, D_i etc ...
 println("tests de base")

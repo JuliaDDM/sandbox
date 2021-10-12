@@ -3,18 +3,25 @@
 # 2021-07-30  Frederic Nataf
 #
 #################################################
-
 include("decomposition.jl")
-
 using .decomposition
-
-
 
 mutable struct Subdomain
     loctoglob::Vector{Int64}
-    not_responsible_for::Dict{Subdomain, Vector{Tuple{Int64, Int64}}} # sdvois -> vecteur de pairs (local number , distant number)
-    responsible_for_others::Dict{Int64, Vector{Tuple{Subdomain, Int64}}}  # k -> vecteur de pairs ( subdomain_vois , k_loc_chezvois )
+    not_responsible_for::Dict{Subdomain, Vector{Tuple{Int64, Int64}}} # sdvois -> vecteur de pairs (local number , distant number in sdvois)
+    responsible_for_others::Dict{Int64, Vector{Tuple{Subdomain, Int64}}}  # k -> vecteur de pairs ( subdomain_vois , k_loc_chezvois ), more or less imposes the way to iterate in function Update.
 end
+
+
+# function subdomains_from_initial_partition( initial_partition , g_adj , overlaps )
+#      ressd = sd
+#     for (sd , ovrlp) ∈ zip(initial_partition , overlaps)
+#         for i ∈ 1:ovrlp
+#         inflate_subdomain( g_adj , sd )
+#
+#     return subdomains
+# end
+
 
 
 # il faut généraliser le Float64, avoir plus de généralité dans le choix du conteneur de la liste des sous domaines, vecteurs, etc ...
@@ -108,8 +115,8 @@ function values(  U::Shared_vector , sd::Subdomain  )
 end
 
 
-# Phase 2 de update, les non responsables vont chercher les valeurs chez le responsable
-function MakeCoherent( U )
+# Phase 2 de update, les non responsables vont lire les valeurs chez le responsable
+function MakeCoherent!( U::Shared_vector )
     for sd ∈ subdomains( U )
         for ( sdneigh , numbering ) ∈ not_responsible_for( sd )
             #            MakeCoherent( U , sd , sdneigh , numbering )
@@ -120,11 +127,32 @@ function MakeCoherent( U )
     end
 end
 
-function MakeCoherent( U , sd , sdneigh , numbering )
+# not used yet. To be inserted in MakeCoherent( U::Shared_vector )???
+# return what???
+function MakeCoherent!( U , sd , sdneigh , numbering )
     for (k,l) ∈ numbering
         values(U,sd)[k] = values(U,sdneigh)[l]
     end
 end
+
+# Phase 1 de update
+# return what???
+function Update_responsible_for_others!( U::Shared_vector )
+    for sd ∈ subdomains( U )
+        for k ∈ keys( responsible_for_others( sd ) )
+            for (sdvois , kvois) ∈ responsible_for_others( sd )[k]
+                values(U,sd)[k] += values(U,sdvois)[kvois]
+            end
+        end
+    end
+end
+
+# return what???
+function Update_wo_partition_of_unity!( U::Shared_vector )
+    Update_responsible_for_others!( U )
+    MakeCoherent!( U::Shared_vector )
+end
+
 
 # il faut reecrire a la main ce cas test avec les nouvelles structures
 # puis tester MakeCoherent
@@ -158,7 +186,7 @@ Vshared=   Shared_vector(Dict( subd1 => V1 , subd2 => V2 ))
 
 
 
-MakeCoherent(Vshared)
+Update_wo_partition_of_unity!(Vshared)
 
 collectiveRi!( Vi , [subd1 ; subd2] , U  )
 U .= 0.

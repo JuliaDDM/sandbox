@@ -168,8 +168,6 @@ Vi[2] = V2
 
 Vshared=   Shared_vector(Dict( subd1 => V1 , subd2 => V2 ))
 
-
-
 Update_wo_partition_of_unity!(Vshared)
 
 collectiveRi!( Vi , [subd1 ; subd2] , U  )

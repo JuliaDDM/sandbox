@@ -48,4 +48,6 @@ initial_decomposition = create_partition_subdomain( g , npart )
 
 inflate_subdomain!( g_adj , initial_decomposition[1] , initial_decomposition )
 
+inflate_subdomain!( g_adj , initial_decomposition[1] , initial_decomposition )
+
 initial_decomposition

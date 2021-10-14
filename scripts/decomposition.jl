@@ -79,7 +79,7 @@ end
 
 # le plus simple est de faire une structure domaine qui soit assez fourre-tout pour être souple et créer après les sous structures pratiques pour les mises à jour.
 # le vecteur who_is_responsible_for sera partagé par tous les sous domaines et permettra de créer les fameuses sous structures pratiques pour les mises à jour.
-# cela devrait permettre de garder les code Update! qui a déjà été écrit. 
+# cela devrait permettre de garder les code Update! qui a déjà été écrit.
 
 # proposition de version passant par la numérotation globale
 mutable struct Subdomain2
@@ -131,8 +131,8 @@ function inflate_subdomain!( g_adj , subdomain , subdomains )
 # indices of the inflated subdomain, the new ones will be put last (otherwise numberings in neighbors have to be modified ??)
 # ici, on est numérotation globale
     inflated_indices = inflate_subdomain( g_adj , global_indices(subdomain) )
-    new_indices = filter(x -> !(x in indices(subdomain)), inflated_indices)
-    append!( indices(subdomain) ,  new_indices )
+    new_indices = filter(x -> !(x in global_indices(subdomain)), inflated_indices)
+    append!( global_indices(subdomain) ,  new_indices )
 # il reste mettre à jour not_responsible_for chez soi
 # et responsible_for_others chez les responsables
 #   for k ∈ new_indices

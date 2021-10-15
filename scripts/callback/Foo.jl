@@ -30,5 +30,5 @@ println("Top-level : 1 + π = $z")
 z = bar(√2, -1) do x, y
     x - y
 end
-println("Top-level : √2 - -1 = $z")
+println("Anonymous : √2 - -1 = $z")
 

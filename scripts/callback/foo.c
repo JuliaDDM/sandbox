@@ -1,7 +1,7 @@
 #include "foo.h"
 
-double bar(const double a, const double b, void *thunk, callback func)
+double bar(const double x, const double y, void *thunk, callback func)
 {
-    return func(thunk, a, b);
+    return func(thunk, x, y);
 }
 

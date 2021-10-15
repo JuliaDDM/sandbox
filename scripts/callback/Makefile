@@ -1,6 +1,5 @@
-# https://www.cprogramming.com/tutorial/shared-libraries-linux-gcc.html
 default: libfoo.so
-	@julia foo.jl
+	@julia Foo.jl
 
 libfoo.so: foo.o
 	@gcc -shared -o libfoo.so foo.o

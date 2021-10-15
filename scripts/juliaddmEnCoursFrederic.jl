@@ -28,7 +28,7 @@ function inflate_subdomain!( g_adj , subdomain , subdomains )
     for kglob ∈ new_indices
         kloc = decomposition.glob_to_loc( subdomain , kglob  )
         sdrespo = subdomains[who_is_responsible_for_who(subdomain)[kglob]]
-        kvois = decomposition.glob_to_loc( sdrespo , kloc  )
+        kvois = decomposition.glob_to_loc( sdrespo , kglob  )
         # mise a jour du responsable
         if haskey( not_responsible_for( subdomain ) , sdrespo )
             push!( not_responsible_for( subdomain )[sdrespo] , ( kloc , kvois ) )

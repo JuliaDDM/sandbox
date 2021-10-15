@@ -62,8 +62,11 @@ mutable struct Subdomain
     who_is_responsible_for_who::Vector{Int64}# vecteur global commun à une decomposition et qui dit qui est responsable de qui stocke en numérotation globale. A la place de Int64 ne faudrait il pas mettre Subdomain????
     not_responsible_for_indices::Vector{Int64}
     loctoglob::Vector{Int64}# utile seulement pour la création du recouvrement (semble t il)
+    # Pierre-> attention au coût d'un dictionnaire
     not_responsible_for::Dict{Subdomain, Vector{Tuple{Int64, Int64}}} # sdrespo du responsable -> vecteur de pairs (local number , distant number in sdrespo)
     responsible_for_others::Dict{Int64, Vector{Tuple{Subdomain, Int64}}}  # k_loc -> vecteur de pairs ( subdomain_vois , k_loc_chezvois )  dupliquant le degré de liberté k_loc, more or less imposes the way to iterate in function Update.
+    # A CHANGER sous la forme 'not_responsible_for' rapidement avec un style plus MPI
+    # responsible_for_others::Dict{Subdomain, Vector{Tuple{Int64, Int64}}} # sd_vois qui a besoin de lui -> Vecteur (k_loc , distant number in sd_vois) surement plus efficace surtout avec une structure dictionnaire
 end
 
 function ndof( sbd::Subdomain )
@@ -113,7 +116,6 @@ initial_partition = create_partition_subdomain( g , npart )
 function create_partition_subdomain( g , npart )
     ( initial_partition , decomposition ) = create_partition( g , npart )
     res = Subdomain[]
-    i = 1
     for indices ∈ initial_partition
         newsd = Subdomain( decomposition , Int64[] , indices , Dict() , Dict() )
         push!( res , newsd )

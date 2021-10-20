@@ -6,7 +6,7 @@
 
 module decomposition
 export create_partition , inflate_subdomain , Subdomain , ndof , not_responsible_for ,
-responsible_for_others , global_indices , create_partition_subdomain , who_is_responsible_for_who
+responsible_for_others , global_indices , create_partition_subdomain , who_is_responsible_for_who , ndof_responsible_for
 #, inflate_subdomain!
 
 using SparseArrays , LightGraphs , GraphPlot , Metis , LinearAlgebra
@@ -71,6 +71,10 @@ end
 
 function ndof( sbd::Subdomain )
     return length(sbd.loctoglob)
+end
+
+function ndof_responsible_for( sbd::Subdomain )
+    return ndof(sbd) - length( not_responsible_for_indices(sbd) )
 end
 
 function not_responsible_for_indices( sbd::Subdomain )

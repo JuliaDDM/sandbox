@@ -88,7 +88,7 @@ end
 
 # Phase 1 de update
 # return what???
-function Update_responsible_for_others!( U::Shared_vector )
+function Update_responsible_for_others!( U::Shared_vector )# not correct for triple intersection or more
     for sd ∈ subdomains( U )
         for k ∈ keys( responsible_for_others( sd ) )
             for (sdvois , kvois) ∈ responsible_for_others( sd )[k]
@@ -100,9 +100,10 @@ end
 
 # return what???
 function Update_wo_partition_of_unity!( U::Shared_vector )
-    Update_responsible_for_others!( U )
+    Update_responsible_for_others!( U )# not correct for triple intersection or more
     MakeCoherent!( U::Shared_vector )
 end
+
 
 
 
@@ -124,7 +125,7 @@ function inflate_subdomain!( g_adj , subdomain , subdomains )
         kloc = decomposition.glob_to_loc( subdomain , kglob  )
         sdrespo = subdomains[who_is_responsible_for_who(subdomain)[kglob]]
         kvois = decomposition.glob_to_loc( sdrespo , kglob  )
-        # mise a jour du responsable
+        # mise a jour du not_responsible_for
         if haskey( not_responsible_for( subdomain ) , sdrespo )
             push!( not_responsible_for( subdomain )[sdrespo] , ( kloc , kvois ) )
         else
@@ -142,7 +143,7 @@ end
 
 function vuesur( U::Shared_vector )
     for sd ∈ subdomains( U )
-@show        println(values( U , sd ))
+      println(values( U , sd ))
     end
 end
 
@@ -150,7 +151,7 @@ end
 ###############@ TESTS BASIQUES ####################################
 
 
-# necesaire mais incomprehensible ???? 
+# necesaire mais incomprehensible ????
 function ndof( sbd::Subdomain )
     return length(sbd.loctoglob)
 end
@@ -204,5 +205,6 @@ import_from_global!( Vshared , uglob )
 
 vuesur( Vshared )
 
-
 Update_wo_partition_of_unity!(Vshared)
+
+vuesur( Vshared )

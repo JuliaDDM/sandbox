@@ -7,7 +7,9 @@
 module decomposition
 export create_partition , inflate_subdomain , Subdomain , ndof , not_responsible_for ,
 responsible_for_others , global_indices , create_partition_subdomain , who_is_responsible_for_who , ndof_responsible_for ,
-inflate_subdomain! , Shared_vector , MakeCoherent! , import_from_global! , export_to_global , vuesur
+neighborhood ,  buffer_responsible_for_others , values ,
+inflate_subdomain! , Shared_vector , subdomains , MakeCoherent! , import_from_global! , export_to_global , vuesur
+# , create_buffers_communication!
 
 using SparseArrays , LightGraphs , GraphPlot , Metis , LinearAlgebra
 
@@ -67,13 +69,15 @@ mutable struct Subdomain
     # utile seulement pour la création du recouvrement (semble t il)
     loctoglob::Vector{Int64}
     # auto explanatory
-    not_responsible_for::Dict{Subdomain, Vector{Tuple{Int64, Int64}}}# a changer après en Vector(triplet comme responsible_for_others)
-     # sdrespo du responsable -> vecteur de pairs (local number , distant number in sdrespo)
+    not_responsible_for::Dict{Subdomain, Vector{Tuple{Int64 , Int64}}}# a changer après en Vector(triplet comme responsible_for_others)
+    # sdrespo du responsable -> vecteur de pairs (local number , distant number in sdrespo)
     responsible_for_others::Vector{Tuple{ Int64 , Subdomain , Int64}}
     # Vector  ( k_loc , subdomain_vois , k_loc_chezvois )
     #responsible_for_others::Dict{Int64, Vector{Tuple{Subdomain, Int64}}}  # k_loc -> vecteur de pairs ( subdomain_vois , k_loc_chezvois )  dupliquant le degré de liberté k_loc, more or less imposes the way to iterate in function Update.
-    #buffer_responsible_for_others::Dict{Subdomain,Vector{Float64}}
-    #  subdomain_vois -> values_from_subdomain_vois ordering related to the orderings of not_responsible_for and responsible_for_others
+    buffer_responsible_for_others::Dict{Subdomain,Vector{Float64}}
+    #subdomain_vois -> vecteur ( value )
+    neighborhood::Dict{Subdomain,Vector{Tuple{Int64,Int64}}}
+    # subdomain_vois > vecteur ( k , k ) donne la manière de parcourir les buffers de communications
 end
 
 function ndof( sbd::Subdomain )
@@ -109,6 +113,14 @@ function global_indices( sbd::Subdomain )
     return sbd.loctoglob
 end
 
+function buffer_responsible_for_others( sbd::Subdomain )
+    return sbd.buffer_responsible_for_others
+end
+
+function neighborhood( sbd::Subdomain )
+    return sbd.neighborhood
+end
+
 
 """
 create_partition_subdomain( g , npart )
@@ -128,7 +140,7 @@ function create_partition_subdomain( g , npart )
     ( initial_partition , decomposition ) = create_partition( g , npart )
     res = Subdomain[]
     for indices ∈ initial_partition
-        newsd = Subdomain( decomposition , Int64[] , indices , Dict() , Vector[] )
+        newsd = Subdomain( decomposition , Int64[] , indices , Dict() , Vector[] , Dict{Subdomain,Vector{Float64}}() , Dict{Subdomain,Vector{Tuple{Int64,Int64}}}() )
         push!( res , newsd )
     end
     return res
@@ -161,7 +173,21 @@ function inflate_subdomain!( g_adj , subdomain , subdomains )
     end
 end
 
-
+# function create_buffers_communication!( sbd )
+#     # liste des sousdomaines voisins dependants
+#     # pour combien de points
+#     sdvois_size_ovlp = Dict{Subdomain,Int64}()
+#     for (k_loc , sdvois , k_loc_chezvois) ∈ responsible_for_others( sbd )
+#         if haskey( sdvois_size_ovlp , sdvois )
+#             sdvois_size_ovlp[sdvois]  += 1
+#         else
+#             sdvois_size_ovlp[sdvois]  = 1
+#         end
+#         for ( sdvois , ndof_vois_ovlp ) ∈ sdvois_size_ovlp
+#             buffer_responsible_for_others[ sdvois ] = zeros( ndof_vois_ovlp )
+#         end
+#     end
+# end
 
 #################################################
 #
@@ -227,7 +253,7 @@ end
 
 function vuesur( U::Shared_vector )
     for sd ∈ subdomains( U )
-      println(values( U , sd ))
+        println(values( U , sd ))
     end
 end
 

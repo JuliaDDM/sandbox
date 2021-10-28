@@ -5,7 +5,7 @@
 #################################################
 
 module decomposition
-export create_partition , inflate_subdomain , Subdomain , ndof , not_responsible_for ,
+export  Subdomain , ndof , not_responsible_for ,
 responsible_for_others , global_indices , create_partition_subdomain , who_is_responsible_for_who , ndof_responsible_for ,
 neighborhood ,  buffer_responsible_for_others , values ,
 inflate_subdomain! , Shared_vector , subdomains , MakeCoherent! , import_from_global! , export_to_global , vuesur ,
@@ -16,7 +16,7 @@ using SparseArrays , LightGraphs , GraphPlot , Metis , LinearAlgebra
 """
 create_partition( g , npart )
 
-Returns a vector of the subdomain indices of a partition of 1:size(g) into npart subdomains
+Returns a pair: vector of the subdomain indices of a partition of 1:size(g) into npart subdomains AND the coloring of the dofs
 # Arguments
 - 'g' : the graph connections of the degrees of freedom
 - 'npart'    : Number of subdomains
@@ -41,8 +41,8 @@ Returns the vector of the indices of the subdomain inflated by its direct neighb
 # Arguments
 - 'g_adj' : the adjacency matrix of the degrees of freedom with non zero on the diagonal (a square matrix)
 - 'subdomain_indices'    : Indices of a subdomain
-# Example
-g_adj = adjacency_matrix(g ,  Int64 )
+# Example on a vector of subdomains
+g_adj = adjacency_matrix( g ,  Int64 )
 (inflated_subdomains , decomposition) = map(sd->inflate_subdomain( g_adj , sd ) ,  initial_partition)
 """
 function inflate_subdomain( g_adj , subdomain_indices::Vector{Int64} )
@@ -80,10 +80,20 @@ mutable struct Subdomain
     # subdomain_vois > vecteur ( k , k ) donne la manière de parcourir les buffers de communications
 end
 
+"""
+ndof( subdomain )
+
+Returns the number of degrees of freedom of a 'subdomain' including its overlap
+"""
 function ndof( sbd::Subdomain )
     return length(sbd.loctoglob)
 end
 
+"""
+ndof_responsible_for( subdomain )
+
+Returns informations on the dofs the subdomain is not responsible for
+"""
 function ndof_responsible_for( sbd::Subdomain )
     return ndof(sbd) - length( not_responsible_for_indices(sbd) )
 end
@@ -147,6 +157,15 @@ function create_partition_subdomain( g , npart )
 end
 
 
+"""
+inflate_subdomain!( g_adj , subdomain , subdomains )
+
+Inflate a 'subdomain' and updates the data structure of itself and of its neighbors but not the communicatin buffers(!)
+# Arguments
+- 'g_adj' : the adjacency matrix of some matrix
+- 'subdomain'   :  subdomain to be inflated
+- 'subdomains'  :  a group of 'subdomains' that contains 'subdomain'
+"""
 function inflate_subdomain!( g_adj , subdomain , subdomains )
     # indices of the inflated subdomain, the new ones will be put last (otherwise numberings in neighbors have to be modified ??)
     # ici, on est en numérotation globale
@@ -204,6 +223,11 @@ mutable struct Shared_vector
     values::Dict{Subdomain, Vector{Float64}}
 end
 
+"""
+ndof( U::Shared_Vector )
+
+Returns the number of dofs in the shared vector, duplicated unknowns count for one only
+"""
 function ndof( U::Shared_vector )
     res = 0
     for sd ∈ subdomains( U )
@@ -213,28 +237,48 @@ function ndof( U::Shared_vector )
 end
 
 
+"""
+subdomains( U::Shared_vector )
 
+Returns the subdomains that support the shared vector 'U'
+"""
 function subdomains(U::Shared_vector)
     return keys(U.values)
 end
 
+"""
+values( U::Shared_vector , subdomain )
+
+Returns the local vector of 'subdomain'
+"""
 function values(  U::Shared_vector , sd::Subdomain  )
     return U.values[sd]
 end
 
 
+# return what???
+"""
+Update_wo_partition_of_unity!( U::Shared_vector )
 
-function Update_responsible_for_others!( U::Shared_vector )# not correct for triple intersection or more
-    for sd ∈ subdomains( U )
-        for sdvois ∈ keys( buffer_responsible_for_others( sd ) )
-            for ( val , ( kloc , klocchezvois ) ) ∈ zip( buffer_responsible_for_others( sd )[ sdvois ] , decomposition.neighborhood( sd )[ sdvois ] )
-                decomposition.values(U,sd)[kloc] += val
-            end
-        end
-    end
+Performs the operation ``(U_i)_{1 ≤ i ≤ N} -> (U_i + R_i ∑_j R_j^T U_j)_{1 ≤ i ≤ N}``
+"""
+function Update_wo_partition_of_unity!( U::Shared_vector )
+    Fetch_not_responsible_for!( U )
+    Update_responsible_for_others!( U )
+    MakeCoherent!( U )
 end
 
+# return what???
+"""
+Update_wo_partition_of_unity!( U::Shared_vector )
 
+Performs the operation ``(U_i)_{1 ≤ i ≤ N} -> (U_i + R_i ∑_j R_j^T D_j U_j)_{1 ≤ i ≤ N}``
+"""
+function Update_wi_partition_of_unity!( U::Shared_vector )
+    MakeCoherent!( U )
+end
+
+# le responsable va lire les valeurs venant des d.d.l. dupliquées
 function Fetch_not_responsible_for!( U::Shared_vector )
     # remplissage des buffers
     for sd ∈ subdomains( U )
@@ -247,16 +291,18 @@ function Fetch_not_responsible_for!( U::Shared_vector )
 end
 
 
-# return what???
-function Update_wo_partition_of_unity!( U::Shared_vector )
-    Fetch_not_responsible_for!( U )
-    Update_responsible_for_others!( U )
-    MakeCoherent!( U )
+# le responsable accumule les valeurs venant des d.d.l. dupliquées
+function Update_responsible_for_others!( U::Shared_vector )
+    for sd ∈ subdomains( U )
+        for sdvois ∈ keys( buffer_responsible_for_others( sd ) )
+            for ( val , ( kloc , klocchezvois ) ) ∈ zip( buffer_responsible_for_others( sd )[ sdvois ] , decomposition.neighborhood( sd )[ sdvois ] )
+                decomposition.values(U,sd)[kloc] += val
+            end
+        end
+    end
 end
 
-
-
-# Phase 2 de update, les non responsables vont lire les valeurs chez le responsable
+# Phase 3 de update, les non responsables vont lire les valeurs chez le responsable
 function MakeCoherent!( U::Shared_vector )
     for sd ∈ subdomains( U )
         for ( sdneigh , numbering ) ∈ not_responsible_for( sd )

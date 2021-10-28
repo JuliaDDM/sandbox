@@ -71,3 +71,7 @@ Update_wo_partition_of_unity!(Vshared)
 vuesur( Vshared )
 
 println(export_to_global(Vshared))
+
+# test à ajouter
+# convergence de RAS
+# divergence de ASM

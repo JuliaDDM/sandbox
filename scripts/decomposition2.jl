@@ -8,8 +8,8 @@ module decomposition
 export create_partition , inflate_subdomain , Subdomain , ndof , not_responsible_for ,
 responsible_for_others , global_indices , create_partition_subdomain , who_is_responsible_for_who , ndof_responsible_for ,
 neighborhood ,  buffer_responsible_for_others , values ,
-inflate_subdomain! , Shared_vector , subdomains , MakeCoherent! , import_from_global! , export_to_global , vuesur
-# , create_buffers_communication!
+inflate_subdomain! , Shared_vector , subdomains , MakeCoherent! , import_from_global! , export_to_global , vuesur ,
+Update_wo_partition_of_unity! , create_buffers_communication!
 
 using SparseArrays , LightGraphs , GraphPlot , Metis , LinearAlgebra
 
@@ -30,7 +30,7 @@ g = Graph(A)
 function create_partition( g , npart )
     decomposition = Metis.partition(g, npart)
     subdomain_partition_indices = map( i-> findall( x-> (x==i) , decomposition ) , 1:npart )
-    return ( subdomain_partition_indices , decomposition)
+    return ( subdomain_partition_indices , decomposition );
 end
 
 
@@ -173,21 +173,25 @@ function inflate_subdomain!( g_adj , subdomain , subdomains )
     end
 end
 
-# function create_buffers_communication!( sbd )
-#     # liste des sousdomaines voisins dependants
-#     # pour combien de points
-#     sdvois_size_ovlp = Dict{Subdomain,Int64}()
-#     for (k_loc , sdvois , k_loc_chezvois) ∈ responsible_for_others( sbd )
-#         if haskey( sdvois_size_ovlp , sdvois )
-#             sdvois_size_ovlp[sdvois]  += 1
-#         else
-#             sdvois_size_ovlp[sdvois]  = 1
-#         end
-#         for ( sdvois , ndof_vois_ovlp ) ∈ sdvois_size_ovlp
-#             buffer_responsible_for_others[ sdvois ] = zeros( ndof_vois_ovlp )
-#         end
-#     end
-# end
+function create_buffers_communication!( sbd::Subdomain )
+    # liste des sousdomaines voisins dependants
+    # pour combien de points
+    sdvois_size_ovlp = Dict{Subdomain,Int64}()
+    for (k_loc , sdvois , k_loc_chezvois) ∈ responsible_for_others( sbd )
+        if haskey( sdvois_size_ovlp , sdvois )
+            sdvois_size_ovlp[sdvois]  += 1
+            push!( decomposition.neighborhood( sbd )[sdvois]  , ( k_loc , k_loc_chezvois ) )
+        else
+            sdvois_size_ovlp[sdvois]  = 1
+            decomposition.neighborhood( sbd )[sdvois]  = [(k_loc , k_loc_chezvois)]
+        end
+    end
+    for ( sdvois , ndof_vois_ovlp ) ∈ sdvois_size_ovlp
+        buffer_responsible_for_others( sbd )[ sdvois ] = zeros( ndof_vois_ovlp )
+    end
+end
+
+
 
 #################################################
 #
@@ -216,6 +220,38 @@ end
 
 function values(  U::Shared_vector , sd::Subdomain  )
     return U.values[sd]
+end
+
+
+
+function Update_responsible_for_others!( U::Shared_vector )# not correct for triple intersection or more
+    for sd ∈ subdomains( U )
+        for sdvois ∈ keys( buffer_responsible_for_others( sd ) )
+            for ( val , ( kloc , klocchezvois ) ) ∈ zip( buffer_responsible_for_others( sd )[ sdvois ] , decomposition.neighborhood( sd )[ sdvois ] )
+                decomposition.values(U,sd)[kloc] += val
+            end
+        end
+    end
+end
+
+
+function Fetch_not_responsible_for!( U::Shared_vector )
+    # remplissage des buffers
+    for sd ∈ subdomains( U )
+        for ( sdvois , fecthed_values ) ∈ buffer_responsible_for_others( sd )
+            for ( k , ( k_loc , k_loc_chezvois ) ) ∈ enumerate( decomposition.neighborhood( sd )[ sdvois ])
+                fecthed_values[k] = decomposition.values(U,sdvois)[k_loc_chezvois]
+            end
+        end
+    end
+end
+
+
+# return what???
+function Update_wo_partition_of_unity!( U::Shared_vector )
+    Fetch_not_responsible_for!( U )
+    Update_responsible_for_others!( U )
+    MakeCoherent!( U )
 end
 
 

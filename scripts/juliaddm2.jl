@@ -3,124 +3,71 @@ include("decomposition2.jl")
 using SparseArrays , LightGraphs , GraphPlot , Metis , LinearAlgebra , .decomposition
 
 
-
-######################################################
-
-
-# Phase 1 de update
-# return what???
-# function Update_responsible_for_others!( U::Shared_vector )# not correct for triple intersection or more
-#     for sd ∈ subdomains( U )
-#         for k ∈ keys( responsible_for_others( sd ) )
-#             for (sdvois , kvois) ∈ responsible_for_others( sd )[k]
-#                 values(U,sd)[k] += values(U,sdvois)[kvois]
-#             end
-#         end
-#     end
-# end
+# m=9
+# A = spdiagm(-1 => -ones(m-1) , 0 => 2. *ones(m) , 1 => -ones(m-1))
 
 
-function Update_responsible_for_others!( U::Shared_vector )# not correct for triple intersection or more
-    for sd ∈ subdomains( U )
-        for sdvois ∈ keys( buffer_responsible_for_others( sd ) )
-            for ( val , ( kloc , klocchezvois ) ) ∈ zip( buffer_responsible_for_others( sd )[ sdvois ] , decomposition.neighborhood( sd )[ sdvois ] )
-                @show decomposition.values(U,sd)[kloc]
-                @show val
-                decomposition.values(U,sd)[kloc] += val
-            end
-        end
-    end
-end
-
-
-function Fetch_not_responsible_for!( U::Shared_vector )
-    # remplissage des buffers
-    for sd ∈ subdomains( U )
-        for ( sdvois , fecthed_values ) ∈ buffer_responsible_for_others( sd )
-            for ( k , ( k_loc , k_loc_chezvois ) ) ∈ enumerate( decomposition.neighborhood( sd )[ sdvois ])
-                @show                 fecthed_values[k] = decomposition.values(U,sdvois)[k_loc_chezvois]
-            end
-        end
-    end
-end
-
-
-# return what???
-function Update_wo_partition_of_unity!( U::Shared_vector )
-    Fetch_not_responsible_for!( U )
-    Update_responsible_for_others!( U )
-    MakeCoherent!( U )
-end
-
-
-###############@ TESTS BASIQUES ####################################
-
-
-m=9
 npart = 3
-A = spdiagm(-1 => -ones(m-1) , 0 => 2. *ones(m) , 1 => -ones(m-1))
+sdiff1(m) = spdiagm(-1 => -ones(m-1) , 0 => ones(m) )
+# make the discrete -Laplacian in 2d, with Dirichlet boundaries
+# adapted from https://math.mit.edu/~stevenj/18.303/lecture-10.html
+function Laplacian2d(Nx, Ny, Lx, Ly)
+   dx = Lx / (Nx+1)
+   dy = Ly / (Ny+1)
+   Dx = sdiff1(Nx) / dx
+   Dy = sdiff1(Ny) / dy
+   Ax = Dx' * Dx
+   Ay = Dy' * Dy
+   return kron( spdiagm( 0 => ones(Ny) ) , Ax) + kron(Ay, spdiagm( 0 => ones(Nx) ))
+end
+
+ m=5
+ n=6
+
+A = Laplacian2d(m,n,1,1)
+
 g = Graph(A)
 initial_decomposition = create_partition_subdomain( g , npart )
 g_adj = adjacency_matrix(g ,  Int64 )
+# will work iff npart >= 3
+inflate_subdomain!( g_adj , initial_decomposition[1] , initial_decomposition );
 
-inflate_subdomain!( g_adj , initial_decomposition[1] , initial_decomposition )
+inflate_subdomain!( g_adj , initial_decomposition[1] , initial_decomposition );
 
-inflate_subdomain!( g_adj , initial_decomposition[1] , initial_decomposition )
+inflate_subdomain!( g_adj , initial_decomposition[1] , initial_decomposition );
 
+inflate_subdomain!( g_adj , initial_decomposition[1] , initial_decomposition );
 
+inflate_subdomain!( g_adj , initial_decomposition[2] , initial_decomposition );
 
-initial_decomposition
+inflate_subdomain!( g_adj , initial_decomposition[3] , initial_decomposition );
 
-Vshareddict = Dict{Subdomain,Vector{Float64}}()
+#initial_decomposition
+
+Vshareddict = Dict{Subdomain,Vector{Float64}}();
 for sd ∈   initial_decomposition
-    Vshareddict[sd] = ones(ndof(sd))
+    Vshareddict[sd] = ones(ndof(sd));
 end
 
-Vshared = Shared_vector(Vshareddict)
+Vshared = Shared_vector(Vshareddict);
 
-
-function create_buffers_communication!( sbd::Subdomain )
-    # liste des sousdomaines voisins dependants
-    # pour combien de points
-    sdvois_size_ovlp = Dict{Subdomain,Int64}()
-    for (k_loc , sdvois , k_loc_chezvois) ∈ responsible_for_others( sbd )
-        if haskey( sdvois_size_ovlp , sdvois )
-            sdvois_size_ovlp[sdvois]  += 1
-            push!( decomposition.neighborhood( sbd )[sdvois]  , ( k_loc , k_loc_chezvois ) )
-        else
-            sdvois_size_ovlp[sdvois]  = 1
-            decomposition.neighborhood( sbd )[sdvois]  = [(k_loc , k_loc_chezvois)]
-        end
-    end
-    for ( sdvois , ndof_vois_ovlp ) ∈ sdvois_size_ovlp
-        buffer_responsible_for_others( sbd )[ sdvois ] = zeros( ndof_vois_ovlp )
-    end
-end
-
-
-
+# Mettre cet appel avant???
 for sd ∈ subdomains( Vshared )
-    create_buffers_communication!( sd )
+    create_buffers_communication!( sd );
 end
 
-
-
 Update_wo_partition_of_unity!(Vshared)
 
 vuesur( Vshared )
 
+uglob = 4. * ones(ndof(Vshared))
 
-# ecrire test de validation
-# changer la forme du dict
-# passer les dict en vecteur??
-# faire une structure plus allégée??
-
-uglob = 4. * ones(m)
-
-import_from_global!( Vshared , uglob )
+import_from_global!( Vshared , uglob );
 
 vuesur( Vshared )
 
 Update_wo_partition_of_unity!(Vshared)
 
 vuesur( Vshared )
+
+println(export_to_global(Vshared))

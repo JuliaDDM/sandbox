@@ -1,13 +1,13 @@
-include("decomposition2.jl")
+include("decompositionparallel.jl")
+#include("decomposition2.jl")
 # faire deux fois include("decompositionEncoursFrederic.jl") semble poser problème
-using SparseArrays , LightGraphs , GraphPlot , Metis , LinearAlgebra , .decomposition
+using SparseArrays , LightGraphs , GraphPlot , Metis , LinearAlgebra , BenchmarkTools , .decomposition
 
 
 # m=9
 # A = spdiagm(-1 => -ones(m-1) , 0 => 2. *ones(m) , 1 => -ones(m-1))
 
 
-npart = 3
 sdiff1(m) = spdiagm(-1 => -ones(m-1) , 0 => ones(m) )
 # make the discrete -Laplacian in 2d, with Dirichlet boundaries
 # adapted from https://math.mit.edu/~stevenj/18.303/lecture-10.html
@@ -21,8 +21,9 @@ function Laplacian2d(Nx, Ny, Lx, Ly)
    return kron( spdiagm( 0 => ones(Ny) ) , Ax) + kron(Ay, spdiagm( 0 => ones(Nx) ))
 end
 
- m=5
- n=6
+npart = 400
+m=1000
+n=1000
 
 A = Laplacian2d(m,n,1,1)
 
@@ -56,21 +57,24 @@ for sd ∈ subdomains( Vshared )
 end
 
 
-Update_wo_partition_of_unity!(Vshared)
+#Update_wo_partition_of_unity!(Vshared)
 
-vuesur( Vshared )
+#vuesur( Vshared )
 
-uglob = 4. * ones(ndof(Vshared))
+uglob = 4. * ones(ndof(Vshared));
 
 import_from_global!( Vshared , uglob );
 
-vuesur( Vshared )
+#vuesur( Vshared )
 
-Update_wo_partition_of_unity!(Vshared)
+@btime Update_wo_partition_of_unity!(Vshared);
 
-vuesur( Vshared )
+#vuesur( Vshared )
 
-println(export_to_global(Vshared))
+#println(export_to_global(Vshared))
+
+# pour motiver le parallelisme programmer RAS
+#fusionner fetch et Update_responsible_for_others et supprimer les buffers de communications
 
 # test à ajouter
 # convergence de RAS

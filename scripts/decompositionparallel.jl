@@ -11,7 +11,7 @@ neighborhood ,  buffer_responsible_for_others , values ,
 inflate_subdomain! , Shared_vector , subdomains , MakeCoherent! , import_from_global! , export_to_global , vuesur ,
 Update_wo_partition_of_unity! , create_buffers_communication!
 
-using SparseArrays , LightGraphs , GraphPlot , Metis , LinearAlgebra
+using SparseArrays , LightGraphs , GraphPlot , Metis , LinearAlgebra, ThreadsX
 
 """
 create_partition( g , npart )
@@ -72,6 +72,7 @@ mutable struct Subdomain
     not_responsible_for::Dict{Subdomain, Vector{Tuple{Int64 , Int64}}}# a changer après en Vector(triplet comme responsible_for_others)
     # sdrespo du responsable -> vecteur de pairs (local number , distant number in sdrespo)
     responsible_for_others::Vector{Tuple{ Int64 , Subdomain , Int64}}
+    # ajoute t on un champ responsible_for??
     # Vector  ( k_loc , subdomain_vois , k_loc_chezvois )
     #responsible_for_others::Dict{Int64, Vector{Tuple{Subdomain, Int64}}}  # k_loc -> vecteur de pairs ( subdomain_vois , k_loc_chezvois )  dupliquant le degré de liberté k_loc, more or less imposes the way to iterate in function Update.
     buffer_responsible_for_others::Dict{Subdomain,Vector{Float64}}
@@ -266,7 +267,7 @@ function Update_wo_partition_of_unity!( U::Shared_vector )
     # Est on vraiment obligé de faire trois opérations. Fusionner Fetch et Update pour éviter les buffers à stocker.
     Fetch_not_responsible_for!( U )
     Update_responsible_for_others!( U )
-    # @sync en parallèle ou bien dépendance de tâches , cf starpu.jl 
+    # @sync en parallèle ou bien dépendance de tâches , cf starpu.jl
     MakeCoherent!( U )
 end
 
@@ -283,7 +284,7 @@ end
 # le responsable va lire les valeurs venant des d.d.l. dupliquées
 function Fetch_not_responsible_for!( U::Shared_vector )
     # remplissage des buffers
-    for sd ∈ subdomains( U )
+    ThreadsX.foreach(subdomains( U )) do sd  #for sd ∈ subdomains( U )
         for ( sdvois , fecthed_values ) ∈ buffer_responsible_for_others( sd )
             for ( k , ( k_loc , k_loc_chezvois ) ) ∈ enumerate( decomposition.neighborhood( sd )[ sdvois ])
                 fecthed_values[k] = decomposition.values(U,sdvois)[k_loc_chezvois]
@@ -295,7 +296,7 @@ end
 
 # le responsable accumule les valeurs venant des d.d.l. dupliquées
 function Update_responsible_for_others!( U::Shared_vector )
-    for sd ∈ subdomains( U )
+    ThreadsX.foreach(subdomains( U )) do sd  #for sd ∈ subdomains( U )
         for sdvois ∈ keys( buffer_responsible_for_others( sd ) )
             for ( val , ( kloc , klocchezvois ) ) ∈ zip( buffer_responsible_for_others( sd )[ sdvois ] , decomposition.neighborhood( sd )[ sdvois ] )
                 decomposition.values(U,sd)[kloc] += val
@@ -306,7 +307,8 @@ end
 
 # Phase 3 de update, les non responsables vont lire les valeurs chez le responsable
 function MakeCoherent!( U::Shared_vector )
-    for sd ∈ subdomains( U )
+    ThreadsX.foreach(subdomains( U )) do sd  #     for sd ∈ subdomains( U )
+        println(Threads.threadid())
         for ( sdneigh , numbering ) ∈ not_responsible_for( sd )
             #            MakeCoherent( U , sd , sdneigh , numbering )
             for (k,l) ∈ numbering
@@ -318,7 +320,7 @@ end
 
 
 function import_from_global!( U::Shared_vector , uglob::Vector{Float64} )
-    for sd ∈ subdomains( U )
+    ThreadsX.foreach(subdomains( U )) do sd  #for sd ∈ subdomains( U )
         values( U , sd )  .=  uglob[ global_indices(sd) ]
     end
 end
@@ -326,8 +328,10 @@ end
 
 # faire make coherent avant ou dedans??
 function export_to_global( U::Shared_vector )
+    # pour clarifier la fonction n'exporter que les données dont on est responsable
     res = zeros( ndof( U ) )
-    for sd ∈ subdomains( U )
+    ThreadsX.foreach(subdomains( U )) do sd  #for sd ∈ subdomains( U )
+        #        for sd ∈ subdomains( U )
         res[ global_indices( sd ) ] .= values( U , sd )
     end
     return res

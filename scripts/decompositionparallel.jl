@@ -78,7 +78,7 @@ mutable struct Subdomain
     buffer_responsible_for_others::Dict{Subdomain,Vector{Float64}}
     #subdomain_vois -> vecteur ( value )
     neighborhood::Dict{Subdomain,Vector{Tuple{Int64,Int64}}}
-    # subdomain_vois > vecteur ( k , k ) donne la manière de parcourir les buffers de communications??? A cOMPLETER
+    # subdomain_vois > vecteur ( k_loc , k_loc ) donne la manière de parcourir les buffers de communications??? A cOMPLETER
 end
 
 """
@@ -196,6 +196,22 @@ end
 function create_buffers_communication!( sbd::Subdomain )
     # liste des sousdomaines voisins dependants
     # pour combien de points
+#    sdvois_size_ovlp = Dict{Subdomain,Int64}()
+    for (k_loc , sdvois , k_loc_chezvois) ∈ responsible_for_others( sbd )
+        if haskey( neighborhood( sbd ) , sdvois )
+#            sdvois_size_ovlp[sdvois]  += 1
+            push!( decomposition.neighborhood( sbd )[sdvois]  , ( k_loc , k_loc_chezvois ) )
+        else
+#            sdvois_size_ovlp[sdvois]  = 1
+            decomposition.neighborhood( sbd )[sdvois]  = [(k_loc , k_loc_chezvois)]
+        end
+    end
+end
+
+
+function create_buffers_communication2!( sbd::Subdomain )
+    # liste des sousdomaines voisins dependants
+    # pour combien de points
     sdvois_size_ovlp = Dict{Subdomain,Int64}()
     for (k_loc , sdvois , k_loc_chezvois) ∈ responsible_for_others( sbd )
         if haskey( sdvois_size_ovlp , sdvois )
@@ -210,7 +226,6 @@ function create_buffers_communication!( sbd::Subdomain )
         buffer_responsible_for_others( sbd )[ sdvois ] = zeros( ndof_vois_ovlp )
     end
 end
-
 
 
 #################################################
@@ -259,17 +274,25 @@ end
 
 # return what???
 """
-Update_wo_partition_of_unity!( U::Shared_vector )
+Update_wo_partition_of_unity2!( U::Shared_vector )
 
 Performs the operation ``(U_i)_{1 ≤ i ≤ N} -> (U_i + R_i ∑_j R_j^T U_j)_{1 ≤ i ≤ N}``
 """
-function Update_wo_partition_of_unity!( U::Shared_vector )
+function Update_wo_partition_of_unity2!( U::Shared_vector )
     # Est on vraiment obligé de faire trois opérations. Fusionner Fetch et Update pour éviter les buffers à stocker.
-    Fetch_not_responsible_for!( U )
+    Fetch_not_responsible_for2!( U )
+    Update_responsible_for_others2!( U )
+    # @sync en parallèle ou bien dépendance de tâches , cf starpu.jl
+    MakeCoherent!( U )
+end
+
+
+function Update_wo_partition_of_unity!( U::Shared_vector )
     Update_responsible_for_others!( U )
     # @sync en parallèle ou bien dépendance de tâches , cf starpu.jl
     MakeCoherent!( U )
 end
+
 
 # return what???
 """
@@ -282,7 +305,7 @@ function Update_wi_partition_of_unity!( U::Shared_vector )
 end
 
 # le responsable va lire les valeurs venant des d.d.l. dupliquées
-function Fetch_not_responsible_for!( U::Shared_vector )
+function Fetch_not_responsible_for2!( U::Shared_vector )
     # remplissage des buffers
     ThreadsX.foreach(subdomains( U )) do sd  #for sd ∈ subdomains( U )
         for ( sdvois , fecthed_values ) ∈ buffer_responsible_for_others( sd )
@@ -295,7 +318,7 @@ end
 
 
 # le responsable accumule les valeurs venant des d.d.l. dupliquées
-function Update_responsible_for_others!( U::Shared_vector )
+function Update_responsible_for_others2!( U::Shared_vector )
     ThreadsX.foreach(subdomains( U )) do sd  #for sd ∈ subdomains( U )
         for sdvois ∈ keys( buffer_responsible_for_others( sd ) )
             for ( val , ( kloc , klocchezvois ) ) ∈ zip( buffer_responsible_for_others( sd )[ sdvois ] , decomposition.neighborhood( sd )[ sdvois ] )
@@ -305,10 +328,21 @@ function Update_responsible_for_others!( U::Shared_vector )
     end
 end
 
+function Update_responsible_for_others!( U::Shared_vector )
+    ThreadsX.foreach(subdomains( U )) do sd #   for sd ∈ subdomains( U )
+        for sdvois ∈ keys( decomposition.neighborhood( sd ) )
+            for ( kloc , klocchezvois ) ∈ decomposition.neighborhood( sd )[ sdvois ]
+                decomposition.values(U,sd)[kloc] += decomposition.values(U,sdvois)[klocchezvois]
+            end
+        end
+    end
+end
+
+
+
 # Phase 3 de update, les non responsables vont lire les valeurs chez le responsable
 function MakeCoherent!( U::Shared_vector )
     ThreadsX.foreach(subdomains( U )) do sd  #     for sd ∈ subdomains( U )
-        println(Threads.threadid())
         for ( sdneigh , numbering ) ∈ not_responsible_for( sd )
             #            MakeCoherent( U , sd , sdneigh , numbering )
             for (k,l) ∈ numbering

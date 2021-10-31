@@ -4,9 +4,6 @@ include("decompositionparallel.jl")
 using SparseArrays , LightGraphs , GraphPlot , Metis , LinearAlgebra , BenchmarkTools , .decomposition
 
 
-# m=9
-# A = spdiagm(-1 => -ones(m-1) , 0 => 2. *ones(m) , 1 => -ones(m-1))
-
 
 sdiff1(m) = spdiagm(-1 => -ones(m-1) , 0 => ones(m) )
 # make the discrete -Laplacian in 2d, with Dirichlet boundaries
@@ -21,11 +18,13 @@ function Laplacian2d(Nx, Ny, Lx, Ly)
    return kron( spdiagm( 0 => ones(Ny) ) , Ax) + kron(Ay, spdiagm( 0 => ones(Nx) ))
 end
 
-npart = 400
-m=1000
-n=1000
 
-A = Laplacian2d(m,n,1,1)
+npart = 3
+m=9
+n=9
+
+A = spdiagm(-1 => -ones(m-1) , 0 => 2. *ones(m) , 1 => -ones(m-1))
+# A = Laplacian2d(m,n,1,1)
 
 g = Graph(A)
 initial_decomposition = create_partition_subdomain( g , npart )
@@ -67,14 +66,13 @@ import_from_global!( Vshared , uglob );
 
 #vuesur( Vshared )
 
-@btime Update_wo_partition_of_unity!(Vshared);
+Update_wo_partition_of_unity!(Vshared);
 
 #vuesur( Vshared )
 
-#println(export_to_global(Vshared))
+println(export_to_global(Vshared))
 
 # pour motiver le parallelisme programmer RAS
-#fusionner fetch et Update_responsible_for_others et supprimer les buffers de communications
 
 # test à ajouter
 # convergence de RAS

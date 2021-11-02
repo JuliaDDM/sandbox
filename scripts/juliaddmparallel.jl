@@ -1,7 +1,5 @@
 include("decompositionparallel.jl")
-#include("decomposition2.jl")
-# faire deux fois include("decompositionEncoursFrederic.jl") semble poser problème
-using SparseArrays , LightGraphs , GraphPlot , Metis , LinearAlgebra , BenchmarkTools , .decomposition
+using SparseArrays , LightGraphs , GraphPlot , Metis , LinearAlgebra , BenchmarkTools , .decomposition, ThreadsX
 
 
 
@@ -73,6 +71,38 @@ Update_wo_partition_of_unity!(Vshared);
 println(export_to_global(Vshared))
 
 # pour motiver le parallelisme programmer RAS
+
+domain = Domain( initial_decomposition );
+
+rhs = ones(ndof(Vshared))
+u = similar(rhs)
+###############################################################
+#
+#    RAS premier jet sans le produit matrice vecteur parallele
+#    U_{n+1} = U_n + ∑_i  R_i^T D_i Ai^{-1} R_i (b - A*U_n)
+#    U_{n+1} =  ∑_i [ R_i^T D_i ( R_i U_n + Ai^{-1} R_i ](b - A*U_n)
+#
+###############################################################
+# factorisation des matrices locales
+Ai_lu = Dict()
+#ThreadsX.foreach(subdomains( U )) do sd # surement faux pour l'instant à cause du dictionaire.
+   for sd ∈ subdomains( domain )
+   Ai_lu[sd] = factorize(A[ global_indices( sd ) , global_indices( sd ) ])
+end
+u .= 0.
+itmax = 50
+Riu = import_from_global( domain , u );
+Rirhs = import_from_global( domain , rhs );
+for i ∈ 1:itmax
+   residual = rhs - A*u
+   import_from_global!( Rirhs , residual )
+   import_from_global!( Riu , u )
+ThreadsX.foreach(subdomains( domain )) do sd  #  for ( sd , facteur ) ∈ Ai_lu
+      decomposition.values( Riu , sd ) .+= Ai_lu[sd]\ decomposition.values( Rirhs , sd )
+   end
+   Update_wi_partition_of_unity!( Riu )
+   export_to_global!( u , Riu )
+end
 
 # test à ajouter
 # convergence de RAS

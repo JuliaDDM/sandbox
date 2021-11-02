@@ -8,8 +8,9 @@ module decomposition
 export  Subdomain , ndof , not_responsible_for ,
 responsible_for_others , global_indices , create_partition_subdomain , who_is_responsible_for_who , ndof_responsible_for ,
 neighborhood ,  buffer_responsible_for_others , values ,
-inflate_subdomain! , Shared_vector , subdomains , MakeCoherent! , import_from_global! , export_to_global , vuesur ,
-Update_wo_partition_of_unity! , create_buffers_communication!
+inflate_subdomain! , Shared_vector , subdomains , MakeCoherent! , import_from_global! , import_from_global , export_to_global , export_to_global! , vuesur ,
+Update_wo_partition_of_unity! , Update_wi_partition_of_unity! , create_buffers_communication! ,
+Domain
 
 using SparseArrays , LightGraphs , GraphPlot , Metis , LinearAlgebra, ThreadsX
 
@@ -230,6 +231,41 @@ end
 
 #################################################
 #
+#       struct Domain
+#
+#################################################
+mutable struct Domain
+    subdomains::Vector{Subdomain}#Vector, Set ???
+end
+
+"""
+ndof( U::Domain )
+
+Returns the number of dofs in the domain, duplicated unknowns count for one only
+"""
+function ndof( U::Domain )
+    res = 0
+    for sd ∈ subdomains( U )
+        res += ndof_responsible_for( sd )
+    end
+    return res
+end
+
+
+"""
+subdomains( U::Domain )
+
+Returns the subdomains that compose the domain 'U'
+"""
+function subdomains(U::Domain)
+    return U.subdomains
+end
+
+
+
+
+#################################################
+#
 #       struct Shared_vector
 #
 #################################################
@@ -359,6 +395,15 @@ function import_from_global!( U::Shared_vector , uglob::Vector{Float64} )
     end
 end
 
+function import_from_global( domain::Domain , uglob::Vector{Float64} )
+    values = Dict{Subdomain, Vector{Float64}}()
+    for sd ∈ subdomains( domain )
+        values[sd] = uglob[ global_indices(sd ) ]
+    end
+    return Shared_vector( values )
+end
+
+
 
 # faire make coherent avant ou dedans??
 function export_to_global( U::Shared_vector )
@@ -371,6 +416,17 @@ function export_to_global( U::Shared_vector )
     return res
 end
 
+function export_to_global!( u::Vector{Float64} , U::Shared_vector )
+    # pour clarifier la fonction n'exporter que les données dont on est responsable
+    # TBD check the sizes
+    ThreadsX.foreach(subdomains( U )) do sd  #for sd ∈ subdomains( U )
+        #        for sd ∈ subdomains( U )
+        u[ global_indices( sd ) ] .= values( U , sd )
+    end
+end
+
+
+
 
 
 function vuesur( U::Shared_vector )
@@ -378,6 +434,8 @@ function vuesur( U::Shared_vector )
         println(values( U , sd ))
     end
 end
+
+
 
 
 

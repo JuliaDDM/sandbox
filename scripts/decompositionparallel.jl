@@ -175,8 +175,6 @@ function inflate_subdomain!( g_adj , subdomain , subdomains )
     new_indices = filter(x -> !(x in global_indices(subdomain)), inflated_indices)
     append!( global_indices(subdomain) ,  new_indices )#loctoglob est mis a jour
     append!( decomposition.not_responsible_for_indices(subdomain) ,  new_indices )
-
-
     # il reste mettre à jour not_responsible_for chez soi
     # et responsible_for_others chez les responsables
     for kglob ∈ new_indices
@@ -364,6 +362,7 @@ function Update_responsible_for_others2!( U::Shared_vector )
     end
 end
 
+# Phase 1 de update
 function Update_responsible_for_others!( U::Shared_vector )
     ThreadsX.foreach(subdomains( U )) do sd #   for sd ∈ subdomains( U )
         for sdvois ∈ keys( decomposition.neighborhood( sd ) )
@@ -376,7 +375,7 @@ end
 
 
 
-# Phase 3 de update, les non responsables vont lire les valeurs chez le responsable
+# Phase 2 de update, les non responsables vont lire les valeurs chez le responsable
 function MakeCoherent!( U::Shared_vector )
     ThreadsX.foreach(subdomains( U )) do sd  #     for sd ∈ subdomains( U )
         for ( sdneigh , numbering ) ∈ not_responsible_for( sd )
@@ -389,12 +388,22 @@ function MakeCoherent!( U::Shared_vector )
 end
 
 
+"""
+import_from_global!( U::Shared_vector , uglob::Vector{Float64} )
+
+Performs the operation ``(U_i = R_i uglob)_{1 ≤ i ≤ N}``
+"""
 function import_from_global!( U::Shared_vector , uglob::Vector{Float64} )
     ThreadsX.foreach(subdomains( U )) do sd  #for sd ∈ subdomains( U )
         values( U , sd )  .=  uglob[ global_indices(sd) ]
     end
 end
 
+"""
+import_from_global( domain::Domain , uglob::Vector{Float64} )
+
+Returns a shared vector ``(R_i uglob)_{1 ≤ i ≤ N}``
+"""
 function import_from_global( domain::Domain , uglob::Vector{Float64} )
     values = Dict{Subdomain, Vector{Float64}}()
     for sd ∈ subdomains( domain )
@@ -406,6 +415,11 @@ end
 
 
 # faire make coherent avant ou dedans??
+"""
+export_to_global( U::Shared_vector )
+
+Returns the global vector uglob such that  ``(R_i uglob = U_i)_{1 ≤ i ≤ N}``
+"""
 function export_to_global( U::Shared_vector )
     # pour clarifier la fonction n'exporter que les données dont on est responsable
     res = zeros( ndof( U ) )
@@ -416,6 +430,11 @@ function export_to_global( U::Shared_vector )
     return res
 end
 
+"""
+export_to_global!( u::Vector{Float64} , U::Shared_vector )
+
+Performs the operation ``(u = U_i)_{1 ≤ i ≤ N}`` for the indices i is responsible for
+"""
 function export_to_global!( u::Vector{Float64} , U::Shared_vector )
     # pour clarifier la fonction n'exporter que les données dont on est responsable
     # TBD check the sizes

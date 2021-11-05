@@ -76,7 +76,7 @@ mutable struct Subdomain
     # ajoute t on un champ responsible_for??
     # Vector  ( k_loc , subdomain_vois , k_loc_chezvois )
     #responsible_for_others::Dict{Int64, Vector{Tuple{Subdomain, Int64}}}  # k_loc -> vecteur de pairs ( subdomain_vois , k_loc_chezvois )  dupliquant le degré de liberté k_loc, more or less imposes the way to iterate in function Update.
-    buffer_responsible_for_others::Dict{Subdomain,Vector{Float64}}
+    buffer_responsible_for_others::Dict{Subdomain,Vector{Float64}}# ne sert plus à rien en fait A supprimer??
     #subdomain_vois -> vecteur ( value )
     neighborhood::Dict{Subdomain,Vector{Tuple{Int64,Int64}}}
     # subdomain_vois > vecteur ( k_loc , k_loc ) donne la manière de parcourir les buffers de communications??? A cOMPLETER

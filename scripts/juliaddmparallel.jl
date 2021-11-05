@@ -30,9 +30,6 @@ inflate_subdomain!( g_adj , initial_decomposition[1] , initial_decomposition );
 inflate_subdomain!( g_adj , initial_decomposition[1] , initial_decomposition );
 inflate_subdomain!( g_adj , initial_decomposition[2] , initial_decomposition );
 inflate_subdomain!( g_adj , initial_decomposition[3] , initial_decomposition );
-for sd ∈ subdomains( Vshared )
-    create_buffers_communication!( sd );
-end
 
 # construcution d'un vecteur partagé
 Vshareddict = Dict{Subdomain,Vector{Float64}}();
@@ -40,6 +37,11 @@ for sd ∈   initial_decomposition
     Vshareddict[sd] = ones(ndof(sd));
 end
 Vshared = Shared_vector(Vshareddict);
+
+for sd ∈ subdomains( Vshared )
+    create_buffers_communication!( sd );
+end
+
 
 uglob = 4. * ones(ndof(Vshared));
 import_from_global!( Vshared , uglob );
@@ -56,14 +58,14 @@ u = similar(rhs)
 #
 #    RAS premier jet sans le produit matrice vecteur parallele
 #    U_{n+1} = U_n + ∑_i  R_i^T D_i Ai^{-1} R_i (b - A*U_n)
-#    U_{n+1} =  ∑_i [ R_i^T D_i ( R_i U_n + Ai^{-1} R_i ](b - A*U_n)
+#    U_{n+1} =  ∑_i R_i^T D_i ( R_i U_n + Ai^{-1} R_i) (b - A*U_n)
 #
 ###############################################################
 # factorisation des matrices locales
 Ai_lu = Dict()
 #ThreadsX.foreach(subdomains( U )) do sd # pas utilisé pour l'instant à cause du dictionaire, sauf si pour un dictionnaire on peut créer la table de correspondances des clés sans connaître encore les valeurs.
-# A NOTER: Le problème est le même que pour une création parallèle d'un  shared_vector , voir la fonction import_from_global à parallèliser 
-   for sd ∈ subdomains( domain )
+# A NOTER: Le problème est le même que pour une création parallèle d'un  shared_vector , voir la fonction import_from_global à parallèliser
+for sd ∈ subdomains( domain )
    Ai_lu[sd] = factorize(A[ global_indices( sd ) , global_indices( sd ) ])
 end
 u .= 0.
@@ -72,16 +74,17 @@ Riu = import_from_global( domain , u );
 Rirhs = import_from_global( domain , rhs );
 for it ∈ 1:itmax
    residual = rhs - A*u
-   println(" iteration " , it , "residual norm :  ", norm(residual))
+   println(" iteration " , it , "  residual norm :  ", norm(residual))
    import_from_global!( Rirhs , residual )
    import_from_global!( Riu , u )
 ThreadsX.foreach(subdomains( domain )) do sd  #  for ( sd , facteur ) ∈ Ai_lu
       decomposition.values( Riu , sd ) .+= Ai_lu[sd]\ decomposition.values( Rirhs , sd )
    end
    Update_wi_partition_of_unity!( Riu )
+#   Update_wo_partition_of_unity!( Riu )# ASM ne converge pas en tant que méthode de point fixe.
    export_to_global!( u , Riu )
 end
-
+# /!\ Si je fais deux copier-coller du fichier global, j'ai une erreur avec ThreadsX !!!!!!!!!!!!!!!!! 
 # test à ajouter
 # convergence de RAS
 # divergence de ASM

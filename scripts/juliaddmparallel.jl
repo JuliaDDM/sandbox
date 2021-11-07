@@ -59,7 +59,6 @@ u = similar(rhs)
 #    RAS premier jet sans le produit matrice vecteur parallele
 #    U_{n+1} = U_n + ∑_i  R_i^T D_i Ai^{-1} R_i (b - A*U_n)
 #    U_{n+1} =  ∑_i R_i^T D_i ( R_i U_n + Ai^{-1} R_i) (b - A*U_n)
-#
 ###############################################################
 # factorisation des matrices locales
 Ai_lu = Dict()
@@ -77,14 +76,46 @@ for it ∈ 1:itmax
    println(" iteration " , it , "  residual norm :  ", norm(residual))
    import_from_global!( Rirhs , residual )
    import_from_global!( Riu , u )
-ThreadsX.foreach(subdomains( domain )) do sd  #  for ( sd , facteur ) ∈ Ai_lu
+   ThreadsX.foreach(subdomains( domain )) do sd  #  for ( sd , facteur ) ∈ Ai_lu
       decomposition.values( Riu , sd ) .+= Ai_lu[sd]\ decomposition.values( Rirhs , sd )
    end
    Update_wi_partition_of_unity!( Riu )
-#   Update_wo_partition_of_unity!( Riu )# ASM ne converge pas en tant que méthode de point fixe.
    export_to_global!( u , Riu )
 end
-# /!\ Si je fais deux copier-coller du fichier global, j'ai une erreur avec ThreadsX !!!!!!!!!!!!!!!!! 
+
+###############################################################
+#
+#    ASM point fixe => divergence
+#    R_i U_{n+1} = R_i U_n + R_i ∑_j  R_j^T    Ai^{-j} R_j (b - A*U_n)
+#    R_i U_{n+1} = R_i U_n + Update_wo_partition_of_unity!( Ridu )
+#
+###############################################################
+u .= 0.
+itmax = 50
+Riu = import_from_global( domain , u );
+du = similar(u)
+du .= 0.
+Ridu = import_from_global( domain , du );
+Rirhs = import_from_global( domain , rhs );
+for it ∈ 1:itmax
+   residual = rhs - A*u
+   println(" iteration " , it , "  residual norm :  ", norm(residual))
+   import_from_global!( Rirhs , residual )
+   ThreadsX.foreach(subdomains( domain )) do sd  #  for ( sd , facteur ) ∈ Ai_lu
+      decomposition.values( Ridu , sd ) .= Ai_lu[sd]\ decomposition.values( Rirhs , sd )
+   end
+   Update_wo_partition_of_unity!( Ridu )# ASM
+#   Update_wi_partition_of_unity!( Ridu )# RAS
+   ThreadsX.foreach(subdomains( domain )) do sd  # for sd
+      decomposition.values( Riu , sd ) .+= decomposition.values( Ridu , sd )
+   end
+   export_to_global!( u , Riu )
+end
+
+#   Update_wo_partition_of_unity!( Riu )# ASM ne converge pas en tant que méthode de point fixe.
+
+
+# /!\ Si je fais deux copier-coller du fichier global, j'ai une erreur avec ThreadsX !!!!!!!!!!!!!!!!!
 # test à ajouter
 # convergence de RAS
 # divergence de ASM

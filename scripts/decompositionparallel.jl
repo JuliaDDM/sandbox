@@ -321,6 +321,11 @@ function Update_wo_partition_of_unity2!( U::Shared_vector )
 end
 
 
+"""
+Update_wo_partition_of_unity!( U::Shared_vector )
+
+Performs the operation ``(U_i)_{1 ≤ i ≤ N} -> (R_i ∑_j R_j^T U_j)_{1 ≤ i ≤ N}``
+"""
 function Update_wo_partition_of_unity!( U::Shared_vector )
     Update_responsible_for_others!( U )
     # @sync en parallèle ou bien dépendance de tâches , cf starpu.jl
@@ -332,7 +337,7 @@ end
 """
 Update_wi_partition_of_unity!( U::Shared_vector )
 
-Performs the operation ``(U_i)_{1 ≤ i ≤ N} -> (U_i + R_i ∑_j R_j^T D_j U_j)_{1 ≤ i ≤ N}``
+Performs the operation ``(U_i)_{1 ≤ i ≤ N} -> (R_i ∑_j R_j^T D_j U_j)_{1 ≤ i ≤ N}``
 """
 function Update_wi_partition_of_unity!( U::Shared_vector )
     MakeCoherent!( U )
@@ -407,7 +412,8 @@ Returns a shared vector ``(R_i uglob)_{1 ≤ i ≤ N}``
 function import_from_global( domain::Domain , uglob::Vector{Float64} )
     values = Dict{Subdomain, Vector{Float64}}()
     for sd ∈ subdomains( domain )
-        values[sd] = uglob[ global_indices(sd ) ]
+        values[sd] = zeros(ndof(sd))
+        values[sd] .= uglob[ global_indices(sd ) ]
     end
     return Shared_vector( values )
 end

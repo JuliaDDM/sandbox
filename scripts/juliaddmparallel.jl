@@ -1,5 +1,6 @@
 include("decompositionparallel.jl")
-using SparseArrays , LightGraphs , GraphPlot , Metis , LinearAlgebra , BenchmarkTools , .decomposition, ThreadsX
+using SparseArrays , LightGraphs , GraphPlot , Metis , LinearAlgebra , BenchmarkTools , .decomposition, ThreadsX , ThreadSafeDicts
+
 
 sdiff1(m) = spdiagm(-1 => -ones(m-1) , 0 => ones(m) )
 # make the discrete -Laplacian in 2d, with Dirichlet boundaries
@@ -18,9 +19,9 @@ npart = 3
 m=9
 n=9
 A = spdiagm(-1 => -ones(m-1) , 0 => 2. *ones(m) , 1 => -ones(m-1))
-# A = Laplacian2d(m,n,1,1)
+# A = Laplacian2d(m,n,1,1);
 
-g = Graph(A)
+g = Graph(A);
 initial_decomposition = create_partition_subdomain( g , npart )
 g_adj = adjacency_matrix(g ,  Int64 )
 # will work iff npart >= 3
@@ -50,7 +51,7 @@ Update_wo_partition_of_unity!(Vshared);
 println(export_to_global(Vshared))
 
 # pour motiver le parallelisme programmation de RAS
-domain = Domain( initial_decomposition );
+domain = Domain( Set(initial_decomposition) );
 # global vectors
 rhs = ones(ndof(Vshared))
 u = similar(rhs)
@@ -61,12 +62,15 @@ u = similar(rhs)
 #    U_{n+1} =  ∑_i R_i^T D_i ( R_i U_n + Ai^{-1} R_i) (b - A*U_n)
 ###############################################################
 # factorisation des matrices locales
-Ai_lu = Dict()
-#ThreadsX.foreach(subdomains( U )) do sd # pas utilisé pour l'instant à cause du dictionaire, sauf si pour un dictionnaire on peut créer la table de correspondances des clés sans connaître encore les valeurs.
+
+Ai_lu = ThreadSafeDict()
+# voir si on a bien une accélération en parallèle => faire un cas 3D
 # A NOTER: Le problème est le même que pour une création parallèle d'un  shared_vector , voir la fonction import_from_global à parallèliser
-for sd ∈ subdomains( domain )
+ ThreadsX.foreach(subdomains( domain ) ) do sd #for sd ∈ subdomains( domain )
    Ai_lu[sd] = factorize(A[ global_indices( sd ) , global_indices( sd ) ])
 end
+# pour // tout en gardant un dictionnaire: Pierre -> factoriser en // et ne faire que protéger les écritures dans le dictionnaire
+# se servir de la correspondance dans domain si domain == vecteur de sous domaines
 u .= 0.
 itmax = 50
 Riu = import_from_global( domain , u );

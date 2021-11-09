@@ -9,10 +9,12 @@ export  Subdomain , ndof , not_responsible_for ,
 responsible_for_others , global_indices , create_partition_subdomain , who_is_responsible_for_who , ndof_responsible_for ,
 neighborhood ,  buffer_responsible_for_others , values ,
 inflate_subdomain! , Shared_vector , subdomains , MakeCoherent! , import_from_global! , import_from_global , export_to_global , export_to_global! , vuesur ,
-Update_wo_partition_of_unity! , Update_wi_partition_of_unity! , create_buffers_communication! ,
+Update_wo_partition_of_unity! , Update_wi_partition_of_unity! , create_buffers_communication! , similar ,
 Domain
 
 using SparseArrays , LightGraphs , GraphPlot , Metis , LinearAlgebra, ThreadsX
+
+import Base.similar
 
 """
 create_partition( g , npart )
@@ -233,7 +235,9 @@ end
 #
 #################################################
 mutable struct Domain
-    subdomains::Vector{Subdomain}#Vector, Set ???
+#    subdomains::Vector{Subdomain}#Vector, Set ???
+    # POU::Dict{Subdomain,Any}
+    subdomains::Set{Subdomain}
 end
 
 """
@@ -286,6 +290,19 @@ function ndof( U::Shared_vector )
     return res
 end
 
+
+"""
+similar( U::Shared_Vector )
+
+Returns a Shared_vector similar to the argument 'U' (mimics Base.similar )
+"""
+function similar( U::Shared_vector )
+    V = Dict{Subdomain, Vector{Float64}}()
+    for sd ∈ subdomains( U )
+        V[sd] = similar( values( U , sd ) )
+    end
+    return V
+end
 
 """
 subdomains( U::Shared_vector )

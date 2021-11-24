@@ -40,7 +40,7 @@ end
 Vshared = Shared_vector(Vshareddict);
 
 for sd ∈ subdomains( Vshared )
-    create_buffers_communication!( sd );
+    create_buffers_communication!( sd );# confusing naming we are not synchronization_buffers
 end
 
 
@@ -116,12 +116,57 @@ for it ∈ 1:itmax
    export_to_global!( u , Riu )
 end
 
-#   Update_wo_partition_of_unity!( Riu )# ASM ne converge pas en tant que méthode de point fixe.
+#
+#
+#
+
+
+DA = Dict{Tuple{Subdomain,Subdomain},SparseMatrixCSC{Float64, Int64}}()
+for sdi ∈ subdomains(domain)
+   for sdj ∈ subdomains(domain)
+   DA[(sdi,sdj)] = A[ global_indices( sdi ) , global_indices( sdj ) ]
+end
+end
+
+
+
+
+# DA(i,j) = R_i A R_j^T D_j
+function shared_mat_vec( DA , x )
+   res = similar( x )
+   y = Di( x )
+   # boucle parallelisable , Di a ajouter somewhere
+   for sdi ∈ subdomains( res )
+      decomposition.values(res , sdi) .= DA[(sdi,sdi)]*decomposition.values(y , sdi)
+   end
+   # boucle sequentiel
+   for sdi ∈ subdomains( y )
+      for sdj ∈ subdomains( y )
+         if ( haskey(DA , (sdi,sdj) ) &&  !( sdi == sdj))
+            decomposition.values(res , sdi) .+= DA[(sdi,sdj)]*decomposition.values(y , sdj)
+         end
+      end
+   end
+   return res
+end
+
+shared_mat_vec( DA , Riu );
+
+# test de shared_mat_vec:
+u .= 2.;
+Au = A*u;
+Du = import_from_global( domain , u );
+ Au - export_to_global(shared_mat_vec( DA , Du ))
 
 
 # /!\ Si je fais deux copier-coller du fichier global, j'ai une erreur avec ThreadsX !!!!!!!!!!!!!!!!!
 # test à ajouter
-# convergence de RAS
-# divergence de ASM
 # tests de non régression ?? : ndofs, Nsd (test en dur ATTENTION le test devra prendre une partition metis en argument )
 # tests en partant de uglobal == 1 puis update et resultat ≤ N
+
+#
+#  Finir cet exemple avec un produit matrice vecteur parallele utilisant la ruse D_dOmaga_i = 0
+#   scattered_mat-vec
+#  Pierre -> Algorithme: blocs diagonaux en // puis les "petits points" en séquentiel car minoritaires donc pas pénalisants
+#  Puis reprendre le tout de maniere plus générale avec le multiniveau en tête et FFDDM -> Pierre-Henri
+#

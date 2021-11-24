@@ -7,7 +7,7 @@
 # MPICommWorld -> l'ensemble des degrés de liberté
 
 
-# pour effectuer le produit matrice vecteur V_i =  ∑_j R'_i A R_j^T D_j V_j
+# pour effectuer le produit matrice vecteur V_i =  ∑_j R'_i A R_j^T D_j U_j  (V = A U)
 mutable struct DOperator
     DDomD::DDomain # domaine de départ décomposé
     DDomA::DDomain # domaine d'arrivée décomposé
@@ -15,7 +15,7 @@ mutable struct DOperator
 end
 
 #https://docs.julialang.org/en/v1/manual/constructors/
-mutable struct Domain
+struct Domain# sous domaine aussi
     up::Domain # le (un??) surdomain éventuellement lui-même ou Nothing???
     loctoglob::AbstractVector{Int64} # vecteur d'indices de up qui sont Domain
     Domain(loctoglob::AbstractVector{Int64}) = ( D = new(); D.loctoglob = copy(loctoglob) ; D.up = D; return D; )
@@ -32,3 +32,12 @@ mutable struct DDomain
     up::Domain # le domain que l'on décompose
     subdomains::Set{POU} # ensemble de (sous domaines , Partition_of_unity) decomposant up
 end
+
+#
+#   Create domain initial_decomposition => DDomain
+#
+#   Create parition of unity  => DDomain aussi ??? 
+#
+#   Create decomposed Operator  => DA
+#
+#

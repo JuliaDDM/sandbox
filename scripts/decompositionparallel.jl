@@ -9,7 +9,7 @@ export  Subdomain , ndof , not_responsible_for ,
 responsible_for_others , global_indices , create_partition_subdomain , who_is_responsible_for_who , ndof_responsible_for ,
 neighborhood ,  buffer_responsible_for_others , values ,
 inflate_subdomain! , Shared_vector , subdomains , MakeCoherent! , import_from_global! , import_from_global , export_to_global , export_to_global! , vuesur ,
-Update_wo_partition_of_unity! , Update_wi_partition_of_unity! , create_buffers_communication! , similar ,
+Update_wo_partition_of_unity! , Update_wi_partition_of_unity! , create_buffers_communication! , similar , Di ,
 Domain
 
 using SparseArrays , LightGraphs , GraphPlot , Metis , LinearAlgebra, ThreadsX
@@ -301,7 +301,7 @@ function similar( U::Shared_vector )
     for sd ∈ subdomains( U )
         V[sd] = similar( values( U , sd ) )
     end
-    return V
+    return Shared_vector(V)
 end
 
 """
@@ -322,6 +322,15 @@ function values(  U::Shared_vector , sd::Subdomain  )
     return U.values[sd]
 end
 
+
+function Di(U::Shared_vector)
+    res = similar(U)
+    for sd ∈ subdomains( res )
+        decomposition.values(res,sd)  .= decomposition.values(U,sd)
+        decomposition.values(res,sd)[ndof_responsible_for( sd )+1:ndof(sd)]  .= 0.
+    end
+    return res
+end
 
 # return what???
 """

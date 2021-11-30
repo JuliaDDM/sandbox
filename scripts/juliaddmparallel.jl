@@ -139,9 +139,10 @@ function shared_mat_vec( DA , x )
    for sdi ∈ subdomains( res )
       decomposition.values(res , sdi) .= DA[(sdi,sdi)]*decomposition.values(y , sdi)
    end
-   # boucle sequentiel
+# boucle exterieur parallelisable
    for sdi ∈ subdomains( y )
-      for sdj ∈ subdomains( y )
+      # boucle sequentiel
+      for sdj ∈ subdomains( y )# ou plus efficace et plus clair , passer par les cles avec premier element fixe et deuxieme sdj
          if ( haskey(DA , (sdi,sdj) ) &&  !( sdi == sdj))
             decomposition.values(res , sdi) .+= DA[(sdi,sdj)]*decomposition.values(y , sdj)
          end

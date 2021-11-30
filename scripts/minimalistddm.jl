@@ -18,7 +18,7 @@ mutable struct DDomain
     subdomains::Set{Domain} # ensemble des sous domaines
     neighborhood::Dict{Subdomain,Vector{Tuple{Int64,Int64}}}
     # subdomain_vois > vecteur ( k_loc , k_vois )
-    POU::DPOU# douteux
+    POU::DPOU# douteux a enlever
 
 end
 
@@ -31,6 +31,19 @@ mutable struct Shared_vector
 
     #
 end
+
+###
+# vecteur global -> vecteur partage (nom malheureux , scattered "eclate" , decomposed DVector ) coherent
+# |                   |
+# |                   |
+# |                   |
+# A*u --> DA*Du
+# (u,v)  -> (Du,Dv)
+# ASM independant de la partition de l'unite
+# vecteur global <- vecteur partage coherent
+#
+# vecteur partage pas forcement coherent : les rendre cohérent , (RAS)
+# somme compensée pour etre plus stable vis a vis des erreurs d'arrondi  --> CF MakeCoherent si partition de l'unite non Booleenne ou Gradient conjugue (aussi???) ? 
 
 
 #https://docs.julialang.org/en/v1/manual/constructors/

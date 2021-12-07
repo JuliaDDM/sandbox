@@ -33,17 +33,18 @@ mutable struct Shared_vector
 end
 
 ###
-# vecteur global -> vecteur partage (nom malheureux , scattered "eclate" , decomposed DVector ) coherent
+# vecteur global -> vecteur decompose coherent (nom malheureux , scattered "eclate" , decomposed DVector ) ->  vecteur decommpose incoherent
 # |                   |
 # |                   |
 # |                   |
-# A*u --> DA*Du
-# (u,v)  -> (Du,Dv)
+# alpha*u ---------> alpha*Du
+# A*u -------------> DA*Du
+# (u,v) -----------> (Du,Dv)= ∑_i (Ui,Di V_i)
 # ASM independant de la partition de l'unite
 # vecteur global <- vecteur partage coherent
 #
 # vecteur partage pas forcement coherent : les rendre cohérent , (RAS)
-# somme compensée pour etre plus stable vis a vis des erreurs d'arrondi  --> CF MakeCoherent si partition de l'unite non Booleenne ou Gradient conjugue (aussi???) ? 
+# somme compensée pour etre plus stable vis a vis des erreurs d'arrondi  --> CF MakeCoherent si partition de l'unite non Booleenne ou Gradient conjugue (aussi???) ?
 
 
 #https://docs.julialang.org/en/v1/manual/constructors/

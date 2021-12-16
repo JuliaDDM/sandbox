@@ -55,11 +55,6 @@ function create_partition_DDomain( g , npart )
     return res
 end
 
-
-
-
-
-
 """
 create_partition( g , npart )
 
@@ -102,8 +97,6 @@ function inflate_indices( g_adj , indices::Vector{Int64} )
     inflated_indices = findall(x->x>0,vi)
     return inflated_indices
 end
-
-
 
 mutable struct Shared_vector
     domain::DDomain

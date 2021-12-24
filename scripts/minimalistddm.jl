@@ -16,23 +16,10 @@ using SparseArrays , LightGraphs , GraphPlot , Metis , LinearAlgebra, ThreadsX
 
 
 
-# pour effectuer le produit matrice vecteur V_i =  ∑_j R'_i A R_j^T D_j U_j  (V = A U)
-mutable struct DOperator
-    DDomD::DDomain # domaine de départ décomposé
-    DDomA::DDomain # domaine d'arrivée décomposé
-    matvec # collection of local operators Aij = R'_i A R_j^T, i ∈ DDomA, j ∈ DDomD
-end
-
-mutable struct DDomain
-    up::Domain # le domaine que l'on décompose
-    subdomains::Set{Domain} # ensemble des sous domaines
-    neighborhood::Dict{Domain,Vector{Tuple{Int64,Int64}}}
-    # subdomain_vois > vecteur ( k_loc , k_vois )
-end
 
 
 """
-create_partition_DDomain( g , npart )
+create_partition_DDomain( Domain , g , npart )
 
 Returns decomposed domain that form a partition of 1:size(g) into npart subdomains
 # Arguments
@@ -45,20 +32,23 @@ A = spdiagm(-1 => -ones(m-1) , 0 => 2. *ones(m) , 1 => -ones(m-1))
 g = Graph(A)
 initial_partition = create_partition_DDomain( g , npart )
 """
-function create_partition_DDomain( g , npart )
+function create_partition_DDomain( domain , g , npart )
+    # il manque un contrôle sur la cohérence entre les indices de domain et ceux de g et surtout l'expression à donner à ce contrôle.
     ( initial_partition , decomposition ) = create_partition( g , npart )
-    res = Subdomain[]
+    res_up = domain
+    res_subdomains = Set{typeof(domain)}()
+    res_neighborhood = Dict{typeof(domain),Vector{Tuple{Int64,Int64}}}()
     for indices ∈ initial_partition
-        newsd = Subdomain( decomposition , Int64[] , indices , Dict() , Vector[] , Dict{Subdomain,Vector{Float64}}() , Dict{Subdomain,Vector{Tuple{Int64,Int64}}}() )
-        push!( res , newsd )
+        newsd = Domain( domain , indices )
+        push!( res_subdomains , newsd )
     end
-    return res
+    return DDomain( res_up , res_subdomains , res_neighborhood )
 end
 
 """
 create_partition( g , npart )
 
-Returns a pair: vector of indices making up a partition of 1:size(g) into npart subdomains AND the coloring of the dofs
+Returns a pair: (vector of indices making up a partition of 1:size(g) into npart subdomains , the coloring of the dofs)
 # Arguments
 - 'g' : the graph connections of the degrees of freedom
 - 'npart'    : Number of subsets of indices
@@ -98,6 +88,45 @@ function inflate_indices( g_adj , indices::Vector{Int64} )
     return inflated_indices
 end
 
+
+
+"""
+inflate_subdomain!( g_adj , subdomain , ddomain )
+
+Inflate a 'subdomain' and updates the overlap of itself and of its neighbors
+# Arguments
+- 'g_adj' : the adjacency matrix of some matrix
+- 'subdomain'   :  subdomain to be inflated
+- 'ddomain'  :  a 'decomposed domain' that contains 'subdomain'
+"""
+function inflate_subdomain!( g_adj , subdomain , ddomain )
+    # up.subdomain == domain ??? A FAIRE
+    # ici, on ne suppose pas partir d'une partition probablement lourd
+    # si on veut faire une version qui ressemble à celle dans decompositionparallel.jl, il
+    # faut garder une centralisation de qui est à qui.
+    # on a pour une decomposition donnée un vecteur global qui à chaque degre de liberte, donne l'ensemble des sous domaines qui le possedent. C'est stocké chez DDomain qui doit donc être adapté. 
+    inflated_indices = inflate_subdomain( g_adj , global_indices(subdomain) )
+    new_indices = filter(x -> !(x in global_indices(subdomain)), inflated_indices)
+    append!( global_indices(subdomain) ,  new_indices )#loctoglob est mis a jour What if range??
+    append!( decomposition.not_responsible_for_indices(subdomain) ,  new_indices )
+    # il reste mettre à jour not_responsible_for chez soi
+    # et responsible_for_others chez les responsables
+    for kglob ∈ new_indices
+        kloc = decomposition.glob_to_loc( subdomain , kglob  )
+        sdrespo = subdomains[who_is_responsible_for_who(subdomain)[kglob]]
+        kvois = decomposition.glob_to_loc( sdrespo , kglob  )
+        # mise a jour du responsable
+        if haskey( not_responsible_for( subdomain ) , sdrespo )
+            push!( not_responsible_for( subdomain )[sdrespo] , ( kloc , kvois ) )
+        else
+            not_responsible_for( subdomain )[sdrespo] = [( kloc , kvois )]
+        end
+        #      responsible_for_others
+        push!( responsible_for_others( sdrespo ) , ( kvois , subdomain , kloc ) )
+    end
+end
+
+
 mutable struct Shared_vector
     domain::DDomain
     vectors::Dict{DDomain, Vector{Float64}}
@@ -128,11 +157,31 @@ end
 
 #https://docs.julialang.org/en/v1/manual/constructors/
 mutable struct Domain# sous domaine aussi
-    up::Domain # le (un??) surdomain éventuellement lui-même
+    up::Domain # le (i.e. un seul??) surdomain éventuellement lui-même
     loctoglob::AbstractVector{Int64} # vecteur d'indices de up qui sont Domain, Int64 pourrait être un paramètre cf indices cartésiens ...
     Domain(loctoglob::AbstractVector{Int64}) = ( D = new(); D.loctoglob = copy(loctoglob) ; D.up = D; return D; )
     Domain(up,loctoglob) =  issubset(loctoglob,up.loctoglob) ?  new(up,loctoglob) : error("indices $loctoglob have to be a subset of the superdomain")
 end
+
+function global_indices( sd::Domain)
+    return sd.loctoglob
+end
+
+
+# pour effectuer le produit matrice vecteur V_i =  ∑_j R'_i A R_j^T D_j U_j  (V = A U)
+mutable struct DDomain
+    up::Domain # le domaine que l'on décompose
+    subdomains::Set{Domain} # ensemble des sous domaines
+    neighborhood::Dict{Domain,Vector{Tuple{Int64,Int64}}}
+    # subdomain_vois --> vecteur ( k_loc , k_vois )
+end
+
+mutable struct DOperator
+    DDomD::DDomain # domaine de départ décomposé
+    DDomA::DDomain # domaine d'arrivée décomposé
+    matvec # collection of local operators Aij = R'_i A R_j^T, i ∈ DDomA, j ∈ DDomD
+end
+
 
 #    Di  # la partition de l'unité locale au sous domaine vue comme un operateur local verifiant une certaine propriété
 #  Di est définie sur un DDomain (constructeur) et on l'interroge en luio donnant un sous domaine et il renvoie le vecteur des poids D(Omage_i)
@@ -155,9 +204,12 @@ end
 #
 # premiers tests
 m=9
+Omega = Domain(1:m)
 npart = 3
 A = spdiagm(-1 => -ones(m-1) , 0 => 2. *ones(m) , 1 => -ones(m-1))
 g = Graph(A)
 (initial_partition  , decomposition) = create_partition( g , npart )
 g_adj = adjacency_matrix( g ,  Int64 )
 (inflated_indices , decomposition) = map(sub_id->inflate_indices( g_adj , sub_id ) ,  initial_partition)
+
+DomDecPartition = create_partition_DDomain( Omega , g , npart )

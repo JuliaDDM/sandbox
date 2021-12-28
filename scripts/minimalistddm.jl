@@ -15,6 +15,35 @@
 using SparseArrays , LightGraphs , GraphPlot , Metis , LinearAlgebra, ThreadsX
 
 
+"""
+intersectalamatlab( a , b )
+
+Returns the intersection of the values of a and b as well their positions
+# Arguments
+- 'a' and 'b' are vectors
+# Example
+a =[3 , 45 , 123 , 12]
+b = [12 , 19 , 46 , 56 , 123]
+intersectalamatlab( a , b )
+([123, 12], [3, 4], [5, 1])
+"""
+function intersectalamatlab( a , b )
+    function findindices!( resa , ab , a)
+        for ( i , el) ∈ enumerate(ab)
+            resa[i] = findfirst( x->x==el , a )
+        end
+    end
+    ab = intersect(a,b)
+    resa=Vector{Int64}(undef,length(ab))
+    findindices!( resa , ab , a)
+    resa
+    resb=similar(resa)
+    findindices!( resb , ab , b)
+    resb
+
+    return (ab , resa , resb )
+end
+
 
 
 
@@ -37,12 +66,11 @@ function create_partition_DDomain( domain , g , npart )
     ( initial_partition , decomposition ) = create_partition( g , npart )
     res_up = domain
     res_subdomains = Set{typeof(domain)}()
-    res_neighborhood = Dict{typeof(domain),Vector{Tuple{Int64,Int64}}}()
     for indices ∈ initial_partition
         newsd = Domain( domain , indices )
         push!( res_subdomains , newsd )
     end
-    return DDomain( res_up , res_subdomains , res_neighborhood )
+    return DDomain( res_up , res_subdomains )
 end
 
 """
@@ -91,51 +119,26 @@ end
 
 
 """
-inflate_subdomain!( g_adj , subdomain , ddomain )
+inflate_subdomain!( g_adj , subdomain )
 
 Inflate a 'subdomain' and updates the overlap of itself and of its neighbors
 # Arguments
 - 'g_adj' : the adjacency matrix of some matrix
-- 'subdomain'   :  subdomain to be inflated
-- 'ddomain'  :  a 'decomposed domain' that contains 'subdomain'
+- 'subdomain'   :  subdomain to be inflated.
 """
-function inflate_subdomain!( g_adj , subdomain , ddomain )
+function inflate_subdomain!( g_adj , subdomain  )
     # up.subdomain == domain ??? A FAIRE
+    # g_adj a bien la taille de up.subdomain???
     # ici, on ne suppose pas partir d'une partition probablement lourd
     # si on veut faire une version qui ressemble à celle dans decompositionparallel.jl, il
     # faut garder une centralisation de qui est à qui.
-    # on a pour une decomposition donnée un vecteur global qui à chaque degre de liberte, donne l'ensemble des sous domaines qui le possedent. C'est stocké chez DDomain qui doit donc être adapté. 
+    # on a pour une decomposition donnée un vecteur global qui à chaque degre de liberte, donne l'ensemble des sous domaines qui le possedent. C'est stocké chez DDomain qui doit donc être adapté.
     inflated_indices = inflate_subdomain( g_adj , global_indices(subdomain) )
     new_indices = filter(x -> !(x in global_indices(subdomain)), inflated_indices)
-    append!( global_indices(subdomain) ,  new_indices )#loctoglob est mis a jour What if range??
-    append!( decomposition.not_responsible_for_indices(subdomain) ,  new_indices )
-    # il reste mettre à jour not_responsible_for chez soi
-    # et responsible_for_others chez les responsables
-    for kglob ∈ new_indices
-        kloc = decomposition.glob_to_loc( subdomain , kglob  )
-        sdrespo = subdomains[who_is_responsible_for_who(subdomain)[kglob]]
-        kvois = decomposition.glob_to_loc( sdrespo , kglob  )
-        # mise a jour du responsable
-        if haskey( not_responsible_for( subdomain ) , sdrespo )
-            push!( not_responsible_for( subdomain )[sdrespo] , ( kloc , kvois ) )
-        else
-            not_responsible_for( subdomain )[sdrespo] = [( kloc , kvois )]
-        end
-        #      responsible_for_others
-        push!( responsible_for_others( sdrespo ) , ( kvois , subdomain , kloc ) )
-    end
+    append!( global_indices(subdomain) ,  new_indices )#loctoglob est mis a jour
 end
 
 
-mutable struct Shared_vector
-    domain::DDomain
-    vectors::Dict{DDomain, Vector{Float64}}
-    # + , - , a* , .* , similar etc ... si on peut automatiquement hériter de ce qui vient de vecteur, on a gagné voir comment faire en Julia
-    # ce qui est lié à l'aspect cohérent : prodscal et donc demande une partition de l'unite qqsoit
-    # relation avec les vecteurs "habituels" : import_from_global(!) , export_to_global(!)
-
-    #
-end
 
 #     POU::DPOU# , en fait c'est plutôt un Shared_vector (cohérent qui en a besoin). En fait, on peut repousser la question POUM à plus tard. la chose principale est de pouvoir coder ∑_i R_i^T R_i
 
@@ -157,7 +160,7 @@ end
 
 #https://docs.julialang.org/en/v1/manual/constructors/
 mutable struct Domain# sous domaine aussi
-    up::Domain # le (i.e. un seul??) surdomain éventuellement lui-même
+    up::Domain # le (i.e. un seul??) surdomaine éventuellement lui-même
     loctoglob::AbstractVector{Int64} # vecteur d'indices de up qui sont Domain, Int64 pourrait être un paramètre cf indices cartésiens ...
     Domain(loctoglob::AbstractVector{Int64}) = ( D = new(); D.loctoglob = copy(loctoglob) ; D.up = D; return D; )
     Domain(up,loctoglob) =  issubset(loctoglob,up.loctoglob) ?  new(up,loctoglob) : error("indices $loctoglob have to be a subset of the superdomain")
@@ -168,14 +171,41 @@ function global_indices( sd::Domain)
 end
 
 
-# pour effectuer le produit matrice vecteur V_i =  ∑_j R'_i A R_j^T D_j U_j  (V = A U)
 mutable struct DDomain
     up::Domain # le domaine que l'on décompose
     subdomains::Set{Domain} # ensemble des sous domaines
-    neighborhood::Dict{Domain,Vector{Tuple{Int64,Int64}}}
+    neighborhood::Dict{Domain,Dict{Domain,Tuple{Vector{Int64},Vector{Int64}}}}
     # subdomain_vois --> vecteur ( k_loc , k_vois )
+    #ajouter ici le code créer neighborhood
+    DDomain( up::Domain , subdomains::Set{Domain} ) = (
+    res_neighborhood = Dict{Domain,Dict{Domain,Tuple{Vector{Int64},Vector{Int64}}}}();
+     for sdi ∈ subdomains
+        res_neighborhood[sdi]=(Dict{Domain,Tuple{Vector{Int64},Vector{Int64}}})();
+        for sdj ∈ subdomains
+            if(sdi !== sdj)
+                (sdisdj , kloc , kvois ) =  intersectalamatlab( global_indices(sdi) , global_indices(sdj) )
+                if( !isempty(sdisdj) )
+                    res_neighborhood[sdi][sdj] = ( kloc , kvois );
+                end
+            end
+        end
+    end;
+    res = new( up , subdomains , res_neighborhood );
+    return res;
+    )
 end
 
+mutable struct Shared_vector
+    domain::DDomain
+    vectors::Dict{DDomain, Vector{Float64}}
+    # + , - , a* , .* , similar etc ... si on peut automatiquement hériter de ce qui vient de vecteur, on a gagné voir comment faire en Julia
+    # ce qui est lié à l'aspect cohérent : prodscal et donc demande une partition de l'unite qqsoit
+    # relation avec les vecteurs "habituels" : import_from_global(!) , export_to_global(!)
+
+    #
+end
+
+# pour effectuer le produit matrice vecteur V_i =  ∑_j R'_i A R_j^T D_j U_j  (V = A U)
 mutable struct DOperator
     DDomD::DDomain # domaine de départ décomposé
     DDomA::DDomain # domaine d'arrivée décomposé
@@ -210,6 +240,13 @@ A = spdiagm(-1 => -ones(m-1) , 0 => 2. *ones(m) , 1 => -ones(m-1))
 g = Graph(A)
 (initial_partition  , decomposition) = create_partition( g , npart )
 g_adj = adjacency_matrix( g ,  Int64 )
-(inflated_indices , decomposition) = map(sub_id->inflate_indices( g_adj , sub_id ) ,  initial_partition)
+ inflated_indices = Vector{Vector{Int64}}();
+ map( sub_id-> push!( inflated_indices , inflate_indices( g_adj , sub_id ) ) ,  initial_partition)
 
 DomDecPartition = create_partition_DDomain( Omega , g , npart )
+
+SetSubdomains = Set{Domain}()# createrus pas tops
+
+map( indic-> push!(SetSubdomains , Domain(Omega,indic) )  , inflated_indices )
+
+my_very_first_DDomain = DDomain( Omega , SetSubdomains )

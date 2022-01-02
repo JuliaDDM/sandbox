@@ -195,15 +195,39 @@ mutable struct DDomain
     )
 end
 
-mutable struct Shared_vector
+mutable struct DVector
     domain::DDomain
-    vectors::Dict{DDomain, Vector{Float64}}
+    data::Dict{Domain, Vector{Float64}}
     # + , - , a* , .* , similar etc ... si on peut automatiquement hériter de ce qui vient de vecteur, on a gagné voir comment faire en Julia
     # ce qui est lié à l'aspect cohérent : prodscal et donc demande une partition de l'unite qqsoit
     # relation avec les vecteurs "habituels" : import_from_global(!) , export_to_global(!)
 
     #
 end
+
+import Base.zero
+function zero(DVec::DVector)
+    data_res=Dict{Domain, Vector{Float64}}()
+    for sd ∈ DVec.domain.subdomains
+        data_res[sd]=zeros(Float64,length(global_indices(sd)))
+    end
+    return DVector(DVec.domain,data_res)
+end
+
+function Update( DVec::DVector )
+    res = zero( DVec )
+    for sd ∈ DVec.domain.subdomains
+        res.data[sd] .= DVec.data[sd]
+    end
+    for sd ∈ DVec.domain.subdomains
+        for sdvois ∈ DVec.domain.neighborhood[sd]
+            res.data[sd][sdvois.second[1]] .+= DVec.data[sdvois.first][sdvois.second[2]]
+        end
+    end
+    return res
+end
+
+
 
 # pour effectuer le produit matrice vecteur V_i =  ∑_j R'_i A R_j^T D_j U_j  (V = A U)
 mutable struct DOperator
@@ -245,8 +269,21 @@ g_adj = adjacency_matrix( g ,  Int64 )
 
 DomDecPartition = create_partition_DDomain( Omega , g , npart )
 
-SetSubdomains = Set{Domain}()# createrus pas tops
+SetSubdomains = Set{Domain}()# createurs pas tops
 
 map( indic-> push!(SetSubdomains , Domain(Omega,indic) )  , inflated_indices )
 
 my_very_first_DDomain = DDomain( Omega , SetSubdomains )
+
+#Ugly mais juste pour tester
+data_vec = Dict{Domain, Vector{Float64}}()
+
+for sd ∈ SetSubdomains
+    data_vec[sd] = ones(Float64,length(global_indices(sd)))
+end
+
+my_DVect=DVector(my_very_first_DDomain,data_vec)
+
+# a debugger
+# a nettoyer,
+# changer les notations, etc ...

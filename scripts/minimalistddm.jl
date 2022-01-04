@@ -330,6 +330,8 @@ function dot_op(x::DVector , y::DVector , dot_op)
     return res
 end
 
+# DV1 .* DV2 , iterable venant d'un abstractvector , risque de perdre le //
+# Vincent --> ou surcharger broadcast 
 
 
 function vuesur( U::DVector )

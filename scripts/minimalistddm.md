@@ -35,3 +35,7 @@ A FAIRE POUR CLARIFIER:
 
 **Unclear topics** 
 - la gestion des informations nécessaires à l'opération $$R_i \sum_j R_j^T\,U_j \longrightarrow V_i$$ sera très différente selon que l'on est en MPI, OpenMP ou autre. 
+
+
+**A FAIRE**
+surcharger getindex et setindex 

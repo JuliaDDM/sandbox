@@ -144,6 +144,13 @@ end
 # somme compensée pour etre plus stable vis a vis des erreurs d'arrondi  --> CF MakeCoherent si partition de l'unite non Booleenne ou Gradient conjugue (aussi???) ?
 
 
+#################################################
+#
+#       struct Domain
+#
+#################################################
+
+
 #https://docs.julialang.org/en/v1/manual/constructors/
 mutable struct Domain# sous domaine aussi
     up::Domain # le (i.e. un seul??) surdomaine éventuellement lui-même
@@ -152,15 +159,21 @@ mutable struct Domain# sous domaine aussi
     Domain(up, loctoglob) = issubset(loctoglob, up.loctoglob) ? new(up, loctoglob) : error("indices $loctoglob have to be a subset of the superdomain")
 end
 
-# potentiellement dangereux 
+# potentiellement dangereux
 function global_indices(sd::Domain)
     return sd.loctoglob
 end
 
-import Base.length 
+import Base.length
 function length(sd::Domain)
-    return length(loctoglob)
+    return length(sd.loctoglob)
 end
+
+#################################################
+#
+#       struct DDomain
+#
+#################################################
 
 
 mutable struct DDomain
@@ -190,6 +203,15 @@ function subdomains( domain::DDomain )
     return domain.subdomains
 end
 
+
+
+
+
+#################################################
+#
+#       struct DVector
+#
+#################################################
 mutable struct DVector
     domain::DDomain
     data::Dict{Domain,Vector{Float64}}
@@ -202,14 +224,50 @@ function subdomains( DVect::DVector )
     return subdomains(DVect.domain)
 end
 
+function values( DVect::DVector , sd::Domain )
+    return DVect.data[sd]
+end
 
-function DVector(domain::DDomain, initial_value::Float64)
+function DVector( ddomain::DDomain , Usrc )
+    if !(length(ddomain.up)==length(Usrc))
+        error("Lengthes of decomposed domain and vector must match: $(length(ddomain.up)) is not $(length(Usrc)) ")
+    end
+    res = DVector( ddomain , 0. )
+    for sd ∈ ddomain.subdomains
+        values( res , sd ) .= Usrc[ global_indices( sd ) ]
+    end
+    return res
+end
+
+import Base.copy
+function copy( DVec::DVector  )
+    res = DVector( DVec.domain , copy(DVec.data) )
+end
+
+function MakeCoherent( DVect::DVector )
+    #Diboolean ensures that the result is roundoff error free
+    return Update(dot_op( Diboolean(DVect.domain) , DVect , (.*) ) )
+end
+
+function DVector2Vector( DVect::DVector )
+    Dres = MakeCoherent( DVect )
+    ddomain = DVect.domain
+    res = zeros( Float64 , length( ddomain.up ) )
+    #peu compatible avec une parallelisation
+    #il faudrait differencier selon que Diboolean est zero ou non
+    for ( sd , val ) ∈ Dres.data
+        res[ global_indices(sd) ] .= val
+    end
+    return res
+end
+
+function DVector(ddomain::DDomain, initial_value::Float64)
     data_res = Dict{Domain,Vector{Float64}}()
-    for sd ∈ domain.subdomains
+    for sd ∈ ddomain.subdomains
         data_res[sd] = zeros(Float64, length(global_indices(sd)))
         data_res[sd] .= initial_value
     end
-    return DVector(domain, data_res)
+    return DVector(ddomain, data_res)
 end
 
 function Update(DVec::DVector)
@@ -236,7 +294,7 @@ returns a decomposed vector that corresponds to a multiplicity based partition o
 function Di( domain::DDomain )
     tmp = DVector( domain , 1.)
     multiplicity = Update(tmp)
-    res = dot_op(tmp , multiplicity , (./) ) 
+    res = dot_op(tmp , multiplicity , (./) )
     return res
 end
 
@@ -262,7 +320,7 @@ end
 
 
 function dot_op(x::DVector , y::DVector , dot_op)
-    if !(x.domain == y.domain) 
+    if !(x.domain == y.domain)
         error("Domains of both decomposed vectors must be the same")
     end
     res = DVector( x.domain , 0. )
@@ -274,6 +332,19 @@ end
 
 
 
+function vuesur( U::DVector )
+    for sd ∈ subdomains( U )
+        println(values( U , sd ))
+    end
+end
+
+
+
+#################################################
+#
+#       struct DOperator
+#
+#################################################
 
 # pour effectuer le produit matrice vecteur V_i =  ∑_j R'_i A R_j^T D_j U_j  (V = A U)
 mutable struct DOperator
@@ -294,15 +365,11 @@ end
 
 
 
+#################################################
 #
-#   Create domain initial_decomposition => DDomain
+#     premiers tests
 #
-#   Create parition of unity  => DDomain aussi ???
-#
-#   Create decomposed Operator  => DA
-#
-#
-# premiers tests
+#################################################
 
 
 sdiff1(m) = spdiagm(-1 => -ones(m-1) , 0 => ones(m) )
@@ -318,13 +385,13 @@ function Laplacian2d(Nx, Ny, Lx, Ly)
    return kron( spdiagm( 0 => ones(Ny) ) , Ax) + kron(Ay, spdiagm( 0 => ones(Nx) ))
 end
 
-m=9
-n=9
-npart = 3
-A = spdiagm(-1 => -ones(m - 1), 0 => 2.0 * ones(m), 1 => -ones(m - 1))
-Omega = Domain(1:m)
-# A = Laplacian2d(m,n,1,1);
-#Omega = Domain(1:m*n)
+m=90
+n=95
+npart = 13
+#A = spdiagm(-1 => -ones(m - 1), 0 => 2.0 * ones(m), 1 => -ones(m - 1))
+#Omega = Domain(1:m)
+ A = Laplacian2d(m,n,1,1);
+Omega = Domain(1:m*n)
 
 g = Graph(A)
 (initial_partition, decomposition) = create_partition(g, npart)
@@ -346,13 +413,37 @@ my_very_first_DVect = DVector(my_very_first_DDomain, 1.)
 aa=Update(my_very_first_DVect)
 bb=DVector(my_very_first_DDomain, 3.)
 
-dot_multiply(aa,bb)
 dot_op(aa , bb , (.*) )
 
 my_very_first_Di= Di(my_very_first_DDomain)
 
-Update(dot_op(my_very_first_Di , my_very_first_DVect , (.*) )) 
+zzz = Update(dot_op(my_very_first_Di , my_very_first_DVect , (.*) ))
 
-# a debugger
+
+ vuesur( zzz )
+
+ vuesur( Diboolean(my_very_first_DDomain))
+
+ vuesur( Update(dot_op( Diboolean(my_very_first_DDomain) , my_very_first_DVect , (.*) ))  )
+
+aaa = collect(1:length(Omega))
+
+daaa = DVector(my_very_first_DDomain,aaa)
+
+vuesur( Update(dot_op( Diboolean(my_very_first_DDomain) , daaa , (.*) ))  )
+
+DVector2Vector(daaa)
+
+vtest = rand(length(Omega))
+norm(vtest .- DVector2Vector(DVector(my_very_first_DDomain,vtest)))
+
+
+
+
+
+
+
+
+
 # a nettoyer,
-# a encapsuler, trop de references aux membres des structures 
+# a encapsuler, trop de references aux membres des structures???

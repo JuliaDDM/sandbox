@@ -38,4 +38,3 @@ A FAIRE POUR CLARIFIER:
 
 
 **A FAIRE**
-surcharger getindex et setindex 

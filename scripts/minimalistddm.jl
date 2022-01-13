@@ -36,35 +36,6 @@ function intersectalamatlab(a, b)
     return (ab, resa, resb)
 end
 
-
-
-
-"""
-create_partition_DDomain( Domain , g , npart )
-
-Returns decomposed domain that form a partition of 1:size(g) into npart subdomains
-# Arguments
-- 'g' : the graph connections of the degrees of freedom
-- 'npart'    : Number of subdomains
-# Example
-m=9
-npart = 3
-A = spdiagm(-1 => -ones(m-1) , 0 => 2. *ones(m) , 1 => -ones(m-1))
-g = Graph(A)
-initial_partition = create_partition_DDomain( g , npart )
-"""
-function create_partition_DDomain(domain, g, npart)
-    # il manque un contrôle sur la cohérence entre les indices de domain et ceux de g et surtout l'expression à donner à ce contrôle.
-    (initial_partition, decomposition) = create_partition(g, npart)
-    res_up = domain
-    res_subdomains = Set{typeof(domain)}()
-    for indices ∈ initial_partition
-        newsd = Domain(domain, indices)
-        push!(res_subdomains, newsd)
-    end
-    return DDomain(res_up, res_subdomains)
-end
-
 """
 create_partition( g , npart )
 
@@ -87,6 +58,35 @@ end
 
 
 
+
+
+"""
+create_partition_DDomain( Domain , g , npart )
+
+Returns a decomposed domain that forms a partition of 1:size(g) into npart subdomains
+# Arguments
+- 'g' : the graph connections of the degrees of freedom
+- 'npart'    : Number of subdomains
+# Example
+m=9
+npart = 3
+A = spdiagm(-1 => -ones(m-1) , 0 => 2. *ones(m) , 1 => -ones(m-1))
+g = Graph(A)
+initial_partition = create_partition_DDomain( g , npart )
+"""
+function create_partition_DDomain(domain, g, npart)
+    # il manque un contrôle sur la cohérence entre les indices de domain et ceux de g et surtout l'expression à donner à ce contrôle.
+    (initial_partition, decomposition) = create_partition(g, npart)
+    res_up = domain
+    res_subdomains = Set{typeof(domain)}()
+    for indices ∈ initial_partition
+        newsd = Domain(domain, indices)
+        push!(res_subdomains, newsd)
+    end
+    return DDomain(res_up, res_subdomains)
+end
+
+
 """
 inflate_indices( g_adj , indices )
 
@@ -95,14 +95,14 @@ Returns the vector of the indices inflated by its direct neighbors as defined by
 - 'g_adj' : the adjacency matrix of the degrees of freedom with non zero on the diagonal (a square matrix)
 - 'indices'    : a set of indices
 # Example on initial_partition (a vector of vector of indices)
-g_adj = adjacency_matrix( g ,  Int64 )
+g_adj =
 (inflated_indices , decomposition) = map(sub_id->inflate_indices( g_adj , sub_id ) ,  initial_partition)
 """
 function inflate_indices(g_adj, indices::Vector{Int64})
     #trouver les voisins
     (n, m) = size(g_adj)
-    vi = zeros(Int64, m)
-    vi[indices] .= 1
+    vi = zeros(Float64, m)
+    vi[indices] .= 1.
     vi = g_adj * vi
     inflated_indices = findall(x -> x > 0, vi)
     return inflated_indices
@@ -113,7 +113,7 @@ end
 """
 inflate_subdomain!( g_adj , subdomain )
 
-Inflate a 'subdomain' and updates the overlap of itself and of its neighbors
+Inflate a 'subdomain' and update the overlap of itself and of its neighbors
 # Arguments
 - 'g_adj' : the adjacency matrix of some matrix
 - 'subdomain'   :  subdomain to be inflated.
@@ -121,6 +121,7 @@ Inflate a 'subdomain' and updates the overlap of itself and of its neighbors
 function inflate_subdomain!(g_adj, subdomain)
     # up.subdomain == domain ??? A FAIRE
     # g_adj a bien la taille de up.subdomain???
+    # que se passe t il avec la partition de l'unité de domain???
     inflated_indices = inflate_subdomain(g_adj, global_indices(subdomain))
     new_indices = filter(x -> !(x in global_indices(subdomain)), inflated_indices)
     append!(global_indices(subdomain), new_indices)#loctoglob est mis a jour, danger creer un nouveau sous domaine plutot?
@@ -128,7 +129,8 @@ end
 
 
 
-#     POU::DPOU# , en fait c'est plutôt un Shared_vector (cohérent qui en a besoin). En fait, on peut repousser la question POUM à plus tard. la chose principale est de pouvoir coder ∑_i R_i^T R_i
+#     POU::DPOU# , en fait c'est plutôt un Shared_vector (cohérent qui en a besoin). En fait, on peut repousser la question POUM à plus tard.
+# la chose principale est de pouvoir coder ∑_i R_i^T R_i
 ###
 # vecteur global -> vecteur decompose coherent ( scattered "eclate" mais pas Shared_vector , decomposed DVector ) ->  vecteur decommpose incoherent
 # |                   |
@@ -140,8 +142,9 @@ end
 # ASM independant de la partition de l'unite
 # vecteur global <- vecteur partage coherent
 #
-# vecteur partage pas forcement coherent : les rendre cohérent , (RAS)
-# somme compensée pour etre plus stable vis a vis des erreurs d'arrondi  --> CF MakeCoherent si partition de l'unite non Booleenne ou Gradient conjugue (aussi???) ?
+# vecteur partage pas forcement coherent : les rendre cohérent , (cf. RAS)
+# somme compensée pour etre plus stable vis a vis des erreurs d'arrondi  -->
+#       -->  CF MakeCoherent si partition de l'unite non Booleenne ou Gradient conjugue (aussi???) ?
 
 
 #################################################
@@ -199,11 +202,9 @@ mutable struct DDomain
     )
 end
 
-function subdomains( domain::DDomain )
+function subdomains(domain::DDomain)
     return domain.subdomains
 end
-
-
 
 
 
@@ -216,50 +217,19 @@ mutable struct DVector
     domain::DDomain
     data::Dict{Domain,Vector{Float64}}
     # + , - , a* , .* , similar etc ... si on peut automatiquement hériter de ce qui vient de vecteur, on a gagné voir comment faire en Julia
-    # ce qui est lié à l'aspect cohérent : prodscal et donc demande une partition de l'unite qqsoit
+    # boucles sur eval ??
+    # ce qui est lié à l'aspect cohérent : prodscal et donc demande une partition de l'unite qulle quelle soit
     # relation avec les vecteurs "habituels" : import_from_global(!) , export_to_global(!)
 end
 
-function subdomains( DVect::DVector )
+function subdomains(DVect::DVector)
     return subdomains(DVect.domain)
 end
 
-function values( DVect::DVector , sd::Domain )
+function values(DVect::DVector, sd::Domain)
     return DVect.data[sd]
 end
 
-function DVector( ddomain::DDomain , Usrc )
-    if !(length(ddomain.up)==length(Usrc))
-        error("Lengthes of decomposed domain and vector must match: $(length(ddomain.up)) is not $(length(Usrc)) ")
-    end
-    res = DVector( ddomain , 0. )
-    for sd ∈ ddomain.subdomains
-        values( res , sd ) .= Usrc[ global_indices( sd ) ]
-    end
-    return res
-end
-
-import Base.copy
-function copy( DVec::DVector  )
-    res = DVector( DVec.domain , copy(DVec.data) )
-end
-
-function MakeCoherent( DVect::DVector )
-    #Diboolean ensures that the result is roundoff error free
-    return Update(dot_op( Diboolean(DVect.domain) , DVect , (.*) ) )
-end
-
-function DVector2Vector( DVect::DVector )
-    Dres = MakeCoherent( DVect )
-    ddomain = DVect.domain
-    res = zeros( Float64 , length( ddomain.up ) )
-    #peu compatible avec une parallelisation
-    #il faudrait differencier selon que Diboolean est zero ou non
-    for ( sd , val ) ∈ Dres.data
-        res[ global_indices(sd) ] .= val
-    end
-    return res
-end
 
 function DVector(ddomain::DDomain, initial_value::Float64)
     data_res = Dict{Domain,Vector{Float64}}()
@@ -270,8 +240,43 @@ function DVector(ddomain::DDomain, initial_value::Float64)
     return DVector(ddomain, data_res)
 end
 
+
+function DVector(ddomain::DDomain, Usrc)
+    if !(length(ddomain.up) == length(Usrc))
+        error("Lengthes of decomposed domain and vector must match: $(length(ddomain.up)) is not $(length(Usrc)) ")
+    end
+    res = DVector(ddomain, 0.0)
+    for sd ∈ ddomain.subdomains
+        values(res, sd) .= Usrc[global_indices(sd)]
+    end
+    return res
+end
+
+import Base.deepcopy
+function deepcopy(DVec::DVector)
+    res = DVector(DVec.domain, deepcopy(DVec.data))
+end
+
+
+function MakeCoherent(DVect::DVector)
+    #Diboolean ensures that the result is roundoff error free
+    return Update(dot_op(Diboolean(DVect.domain), DVect, (.*)))
+end
+
+function DVector2Vector(DVect::DVector)
+    Dres = MakeCoherent(DVect)
+    ddomain = DVect.domain
+    res = zeros(Float64, length(ddomain.up))
+    #peu compatible avec une parallelisation
+    #il faudrait differencier selon que Diboolean est zero ou non
+    for (sd, val) ∈ Dres.data
+        res[global_indices(sd)] .= val
+    end
+    return res
+end
+
 function Update(DVec::DVector)
-    res = DVector(DVec.domain,0.)
+    res = DVector(DVec.domain, 0.0)
     for sd ∈ DVec.domain.subdomains
         res.data[sd] .= DVec.data[sd]
     end
@@ -291,10 +296,10 @@ returns a decomposed vector that corresponds to a multiplicity based partition o
 # Arguments
 - 'domain' : the support domain
 """
-function Di( domain::DDomain )
-    tmp = DVector( domain , 1.)
+function Di(domain::DDomain)
+    tmp = DVector(domain, 1.0)
     multiplicity = Update(tmp)
-    res = dot_op(tmp , multiplicity , (./) )
+    res = dot_op(tmp, multiplicity, (./))
     return res
 end
 
@@ -306,12 +311,12 @@ returns a decomposed vector that corresponds to a Boolean partition of unity fun
 # Arguments
 - 'domain' : the support domain
 """
-function Diboolean( domain::DDomain )
-    res = DVector( domain , 1.)
-    vector_of_subdomains = collect( subdomains(domain) )
-    for (i , sd) ∈ enumerate(vector_of_subdomains)
-        for sdvois ∈ intersect(vector_of_subdomains[i+1:end] , collect(keys(domain.overlaps[sd])))
-            res.data[sdvois][ domain.overlaps[sd][sdvois][2] ]  .= 0.
+function Diboolean(domain::DDomain)
+    res = DVector(domain, 1.0)
+    vector_of_subdomains = collect(subdomains(domain))
+    for (i, sd) ∈ enumerate(vector_of_subdomains)
+        for sdvois ∈ intersect(vector_of_subdomains[i+1:end], collect(keys(domain.overlaps[sd])))
+            res.data[sdvois][domain.overlaps[sd][sdvois][2]] .= 0.0
         end
     end
     return res
@@ -319,24 +324,24 @@ end
 
 
 
-function dot_op(x::DVector , y::DVector , dot_op)
+function dot_op(x::DVector, y::DVector, dot_op)
     if !(x.domain == y.domain)
         error("Domains of both decomposed vectors must be the same")
     end
-    res = DVector( x.domain , 0. )
+    res = DVector(x.domain, 0.0)
     for sd ∈ subdomains(res)
-        res.data[sd] .= dot_op( x.data[sd] , y.data[sd] )
+        res.data[sd] .= dot_op(x.data[sd], y.data[sd])
     end
     return res
 end
 
 # DV1 .* DV2 , iterable venant d'un abstractvector , risque de perdre le //
-# Vincent --> ou surcharger broadcast 
+# Vincent --> ou surcharger broadcast
 
 
-function vuesur( U::DVector )
-    for sd ∈ subdomains( U )
-        println(values( U , sd ))
+function vuesur(U::DVector)
+    for sd ∈ subdomains(U)
+        println(values(U, sd))
     end
 end
 
@@ -353,7 +358,44 @@ mutable struct DOperator
     DDomD::DDomain # domaine de départ décomposé
     DDomA::DDomain # domaine d'arrivée décomposé
     matvec # collection of local operators Aij = R'_i A R_j^T, i ∈ DDomA, j ∈ DDomD
+    # ou plutot le produit matrice vecteur avec un DVector qui vit sur DDomD? ??
 end
+
+"""
+# Arguments
+- 'DDomD'
+- 'A' : a square matrix given by its entries
+"""
+function DOperator(DDomD, A)
+    DA = Dict{Tuple{Domain,Domain},SparseMatrixCSC{Float64,Int64}}()
+    for sdi ∈ subdomains(DDomD)
+        for sdj ∈ subdomains(DDomD)
+            DA[(sdi, sdj)] = A[global_indices(sdi), global_indices(sdj)]
+        end
+    end
+    function shared_mat_vec( x )
+        res = DVector( DDomD , 0. )
+        y = Di( DDomD )
+        # boucle parallelisable , Di a ajouter somewhere
+        for sdi ∈ subdomains( res )
+           values(res , sdi) .= DA[(sdi,sdi)]*values(y , sdi)
+        end
+     # boucle exterieur parallelisable
+        for sdi ∈ subdomains( y )
+           # boucle sequentiel
+           for sdj ∈ subdomains( y )# ou plus efficace et plus clair , passer par les cles avec premier element fixe et deuxieme sdj
+              if ( haskey(DA , (sdi,sdj) ) &&  !( sdi == sdj))
+                 values(res , sdi) .+= DA[(sdi,sdj)]*values(y , sdj)
+              end
+           end
+        end
+        return res
+     end
+     return DOperator( DDomD , DDomD , shared_mat_vec )
+end
+
+
+
 
 
 #    Di  # la partition de l'unité locale au sous domaine vue comme un operateur local verifiant une certaine propriété
@@ -374,30 +416,32 @@ end
 #################################################
 
 
-sdiff1(m) = spdiagm(-1 => -ones(m-1) , 0 => ones(m) )
+sdiff1(m) = spdiagm(-1 => -ones(m - 1), 0 => ones(m))
 # make the discrete -Laplacian in 2d, with Dirichlet boundaries
 # adapted from https://math.mit.edu/~stevenj/18.303/lecture-10.html
 function Laplacian2d(Nx, Ny, Lx, Ly)
-   dx = Lx / (Nx+1)
-   dy = Ly / (Ny+1)
-   Dx = sdiff1(Nx) / dx
-   Dy = sdiff1(Ny) / dy
-   Ax = Dx' * Dx
-   Ay = Dy' * Dy
-   return kron( spdiagm( 0 => ones(Ny) ) , Ax) + kron(Ay, spdiagm( 0 => ones(Nx) ))
+    dx = Lx / (Nx + 1)
+    dy = Ly / (Ny + 1)
+    Dx = sdiff1(Nx) / dx
+    Dy = sdiff1(Ny) / dy
+    Ax = Dx' * Dx
+    Ay = Dy' * Dy
+    return kron(spdiagm(0 => ones(Ny)), Ax) + kron(Ay, spdiagm(0 => ones(Nx)))
 end
 
-m=90
-n=95
-npart = 13
-#A = spdiagm(-1 => -ones(m - 1), 0 => 2.0 * ones(m), 1 => -ones(m - 1))
-#Omega = Domain(1:m)
- A = Laplacian2d(m,n,1,1);
-Omega = Domain(1:m*n)
+ m = 9
+ n = 95
+ npart = 3
+
+
+A = spdiagm(-1 => -ones(m - 1), 0 => 2.0 * ones(m), 1 => -ones(m - 1))
+Omega = Domain(1:m)
+# A = Laplacian2d(m, n, 1, 1);
+# Omega = Domain(1:m*n)
 
 g = Graph(A)
 (initial_partition, decomposition) = create_partition(g, npart)
-g_adj = adjacency_matrix(g, Int64)
+g_adj = abs.(A)
 inflated_indices = Vector{Vector{Int64}}();
 map(sub_id -> push!(inflated_indices, inflate_indices(g_adj, sub_id)), initial_partition)
 
@@ -410,42 +454,40 @@ map(indic -> push!(SetSubdomains, Domain(Omega, indic)), inflated_indices)
 my_very_first_DDomain = DDomain(Omega, SetSubdomains)
 
 
-my_very_first_DVect = DVector(my_very_first_DDomain, 1.)
+my_very_first_DVect = DVector(my_very_first_DDomain, 1.0)
 
-aa=Update(my_very_first_DVect)
-bb=DVector(my_very_first_DDomain, 3.)
+aa = Update(my_very_first_DVect)
+bb = DVector(my_very_first_DDomain, 3.0)
 
-dot_op(aa , bb , (.*) )
+dot_op(aa, bb, (.*))
 
-my_very_first_Di= Di(my_very_first_DDomain)
+my_very_first_Di = Di(my_very_first_DDomain)
 
-zzz = Update(dot_op(my_very_first_Di , my_very_first_DVect , (.*) ))
+zzz = Update(dot_op(my_very_first_Di, my_very_first_DVect, (.*)))
 
 
- vuesur( zzz )
+vuesur(zzz)
 
- vuesur( Diboolean(my_very_first_DDomain))
+vuesur(Diboolean(my_very_first_DDomain))
 
- vuesur( Update(dot_op( Diboolean(my_very_first_DDomain) , my_very_first_DVect , (.*) ))  )
+vuesur(Update(dot_op(Diboolean(my_very_first_DDomain), my_very_first_DVect, (.*))))
 
 aaa = collect(1:length(Omega))
 
-daaa = DVector(my_very_first_DDomain,aaa)
+daaa = DVector(my_very_first_DDomain, aaa)
 
-vuesur( Update(dot_op( Diboolean(my_very_first_DDomain) , daaa , (.*) ))  )
+vuesur(Update(dot_op(Diboolean(my_very_first_DDomain), daaa, (.*))))
 
 DVector2Vector(daaa)
 
 vtest = rand(length(Omega))
-norm(vtest .- DVector2Vector(DVector(my_very_first_DDomain,vtest)))
+norm(vtest .- DVector2Vector(DVector(my_very_first_DDomain, vtest)))
 
+DA = DOperator(my_very_first_DDomain , A)
 
-
-
-
-
-
-
-
+# faire DOperator
+# faire des tests
+# paralleliser
+# commenter
 # a nettoyer,
 # a encapsuler, trop de references aux membres des structures???

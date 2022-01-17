@@ -253,6 +253,7 @@ function DVector(ddomain::DDomain, Usrc)
 end
 
 import Base.deepcopy
+# passer par le metaprogramming : eval; expr pour passer d'un coup toutes les fonctions de base de Vector vers DVector
 function deepcopy(DVec::DVector)
     res = DVector(DVec.domain, deepcopy(DVec.data))
 end
@@ -323,7 +324,6 @@ function Diboolean(domain::DDomain)
 end
 
 
-
 function dot_op(x::DVector, y::DVector, dot_op)
     if !(x.domain == y.domain)
         error("Domains of both decomposed vectors must be the same")
@@ -389,7 +389,10 @@ function DOperator(DDomD, A)
               end
            end
         end
-        return res
+        # 1) qu'en est il de la cohérence du vecteur resultat (à faire avec une partition booleenne Dib
+        # 2) de l'indépendance vis à vis de l'ordre d'éxecution en // (reproductibilité en cause) 3) vis à vis du séquentiel?
+        # Solutions: faire les opérations dans le même ordre ? via un surcoût garantir l'indépendance des résultats vis à vis de l'ordre de la somme (arithmétique compensée)
+        return MakeCoherent(res)#manque la reproductibilité
      end
      return DOperator( DDomD , DDomD , shared_mat_vec )
 end

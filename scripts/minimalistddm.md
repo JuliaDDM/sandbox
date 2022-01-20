@@ -37,4 +37,10 @@ A FAIRE POUR CLARIFIER:
 - la gestion des informations nécessaires à l'opération $$R_i \sum_j R_j^T\,U_j \longrightarrow V_i$$ sera très différente selon que l'on est en MPI, OpenMP ou autre. 
 
 
-**A FAIRE**
+**A FAIRE PLUS TARD**
+Pour le DOperator 
+1. qu'en est il de la cohérence du vecteur resultat (à faire avec une partition booleenne Dib
+2. de l'indépendance vis à vis de l'ordre d'éxecution en // (reproductibilité en cause) 
+3. vis à vis du séquentiel?
+    1. Solutions: faire les opérations dans le même ordre ? via un surcoût garantir l'indépendance des résultats vis à vis de l'ordre de la somme (arithmétique compensée)
+    2. voir les commentaires dans le code

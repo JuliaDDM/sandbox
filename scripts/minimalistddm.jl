@@ -28,6 +28,7 @@ function intersectalamatlab(a, b)
     ab = intersect(a, b)
     resa = Vector{Int64}(undef, length(ab))
     findindices!(resa, ab, a)
+    # comment lines resa and resb
     resa
     resb = similar(resa)
     findindices!(resb, ab, b)
@@ -226,6 +227,7 @@ function subdomains(DVect::DVector)
     return subdomains(DVect.domain)
 end
 
+import Base.values
 function values(DVect::DVector, sd::Domain)
     return DVect.data[sd]
 end
@@ -240,23 +242,76 @@ function DVector(ddomain::DDomain, initial_value::Float64)
     return DVector(ddomain, data_res)
 end
 
+import Base.ones, Base.zeros
+for sym in [ :ones , :zeros ]
+    @eval function $(Symbol(string(sym)))(ddomain::DDomain)
+        # Float64 should be inferred automatically
+        data_res = Dict{Domain,Vector{Float64}}()
+        for sd ∈ ddomain.subdomains
+            #here as well
+            data_res[sd] = $sym( length(global_indices(sd)) )
+        end
+        return DVector(ddomain, data_res)
+    end
+end
 
+"""
+DVector( domain , vecsrc )
+
+Returns a decomposed vector built from a vector
+# Arguments
+- 'domain' : the decomposed domain
+- 'vecsrc' : the classical vector
+"""
 function DVector(ddomain::DDomain, Usrc)
     if !(length(ddomain.up) == length(Usrc))
         error("Lengthes of decomposed domain and vector must match: $(length(ddomain.up)) is not $(length(Usrc)) ")
     end
     res = DVector(ddomain, 0.0)
+    #what if Usrc is already a decomposed vector??
     for sd ∈ ddomain.subdomains
         values(res, sd) .= Usrc[global_indices(sd)]
     end
     return res
 end
 
-import Base.deepcopy
-# passer par le metaprogramming : eval; expr pour passer d'un coup toutes les fonctions de base de Vector vers DVector
-function deepcopy(DVec::DVector)
-    res = DVector(DVec.domain, deepcopy(DVec.data))
+import  Base.similar
+# first try of Metaprogramming
+for sym in [ :similar   ]
+    @eval function $(Symbol(string(sym)))(a::DVector)
+        res = DVector(a.domain, 0.0)
+        for sd ∈ subdomains(res)
+            values(res, sd) .=  $sym( values(a,sd) )
+        end
+        return res
+    end
 end
+
+import Base.copy
+function copy(DVec::DVector)
+    res = DVector(DVec.domain, 0.0)
+    for sdi ∈ subdomains(DVec)
+#        res_data[sdi] = copy(values(DVec,sdi))
+        res_data[sdi] .= values(DVec,sdi)
+    end
+    res = DVector(DVec.domain, res_data)
+end
+
+
+function dot_op(x::DVector, y::DVector, dot_op)
+    if !(x.domain == y.domain)
+        error("Domains of both decomposed vectors must be the same")
+    end
+    res = DVector(x.domain, 0.0)
+    for sd ∈ subdomains(res)
+        res.data[sd] .= dot_op(x.data[sd], y.data[sd])
+    end
+    return res
+end
+
+# DV1 .* DV2 , iterable venant d'un abstractvector , risque de perdre le //
+# Vincent --> ou surcharger broadcast
+
 
 
 function MakeCoherent(DVect::DVector)
@@ -324,21 +379,6 @@ function Diboolean(domain::DDomain)
 end
 
 
-function dot_op(x::DVector, y::DVector, dot_op)
-    if !(x.domain == y.domain)
-        error("Domains of both decomposed vectors must be the same")
-    end
-    res = DVector(x.domain, 0.0)
-    for sd ∈ subdomains(res)
-        res.data[sd] .= dot_op(x.data[sd], y.data[sd])
-    end
-    return res
-end
-
-# DV1 .* DV2 , iterable venant d'un abstractvector , risque de perdre le //
-# Vincent --> ou surcharger broadcast
-
-
 function vuesur(U::DVector)
     for sd ∈ subdomains(U)
         println(values(U, sd))
@@ -361,6 +401,8 @@ mutable struct DOperator
     # ou plutot le produit matrice vecteur avec un DVector qui vit sur DDomD? ??
 end
 
+
+
 """
 # Arguments
 - 'DDomD'
@@ -374,12 +416,19 @@ function DOperator(DDomD, A)
         end
     end
     function shared_mat_vec( x )
-        res = DVector( DDomD , 0. )
-        y = Di( DDomD )
-        # boucle parallelisable , Di a ajouter somewhere
+        dom = x.domain
+        res = zeros(dom)
+        y = zeros(dom)
+        #Diboolean pour avoir plus de reproductibilité?
+        di = Di( dom )
+        for sdi ∈ subdomains( dom )
+            values( y , sdi ) .= values(di,sdi) .* values(x,sdi)
+        end
+        # boucle parallelisable
         for sdi ∈ subdomains( res )
            values(res , sdi) .= DA[(sdi,sdi)]*values(y , sdi)
         end
+        @show res
      # boucle exterieur parallelisable
         for sdi ∈ subdomains( y )
            # boucle sequentiel
@@ -397,7 +446,40 @@ function DOperator(DDomD, A)
      return DOperator( DDomD , DDomD , shared_mat_vec )
 end
 
+#################################################
+#
+#       struct DOperatorBlockJacobi
+#
+#################################################
 
+struct DOperatorBlockJacobi
+    DDomD::DDomain # domaine de départ et d'arrivée décomposé
+    DDomA::DDomain # domaine de départ et d'arrivée décomposé
+    matvec # collection of local solvers
+end
+
+"""
+# Arguments
+- 'DDomD'
+- 'A' : a square matrix given by its entries
+"""
+function DOperatorBlockJacobi(DDomD, A)
+    DA_lu = Dict()
+    for sdi ∈ subdomains(DDomD)
+        DA_lu[sdi] = factorize(A[global_indices(sdi), global_indices(sdi)]  )
+    end
+
+    function shared_mat_vec( x )
+        dom = x.domain
+        res = DVector( dom , 0. )
+        # boucle parallelisable , Di a ajouter somewhere
+        for sdi ∈ subdomains( res )
+           values(res , sdi) .= DA_lu[sdi]\ values(x , sdi)
+        end
+        return res
+     end
+     return DOperatorBlockJacobi( DDomD , DDomD , shared_mat_vec )
+end
 
 
 
@@ -487,6 +569,11 @@ vtest = rand(length(Omega))
 norm(vtest .- DVector2Vector(DVector(my_very_first_DDomain, vtest)))
 
 DA = DOperator(my_very_first_DDomain , A)
+
+DA.matvec(daaa)
+
+Am1=DOperatorBlockJacobi(my_very_first_DDomain , A)
+Am1.matvec(daaa)
 
 # faire DOperator
 # faire des tests

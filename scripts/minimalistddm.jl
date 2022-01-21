@@ -5,7 +5,7 @@
 #################################################
 # essai de partir du point de vue utilisateur
 # il existe qq part une numérotation globale
-using SparseArrays, LightGraphs, GraphPlot, Metis, LinearAlgebra, ThreadsX
+using SparseArrays, LightGraphs, GraphPlot, Metis, LinearAlgebra, ThreadsX, Test
 
 """
 intersectalamatlab( a , b )
@@ -242,8 +242,8 @@ function DVector(ddomain::DDomain, initial_value::Float64)
     return DVector(ddomain, data_res)
 end
 
-import Base.ones, Base.zeros
-for sym in [ :ones , :zeros ]
+import Base.ones, Base.zeros , Base.rand
+for sym in [ :ones , :zeros , :rand ]
     @eval function $(Symbol(string(sym)))(ddomain::DDomain)
         # Float64 should be inferred automatically
         data_res = Dict{Domain,Vector{Float64}}()
@@ -251,7 +251,7 @@ for sym in [ :ones , :zeros ]
             #here as well
             data_res[sd] = $sym( length(global_indices(sd)) )
         end
-        return DVector(ddomain, data_res)
+        return MakeCoherent(DVector(ddomain, data_res))
     end
 end
 
@@ -428,7 +428,6 @@ function DOperator(DDomD, A)
         for sdi ∈ subdomains( res )
            values(res , sdi) .= DA[(sdi,sdi)]*values(y , sdi)
         end
-        @show res
      # boucle exterieur parallelisable
         for sdi ∈ subdomains( y )
            # boucle sequentiel
@@ -519,10 +518,10 @@ end
  npart = 3
 
 
-A = spdiagm(-1 => -ones(m - 1), 0 => 2.0 * ones(m), 1 => -ones(m - 1))
-Omega = Domain(1:m)
-# A = Laplacian2d(m, n, 1, 1);
-# Omega = Domain(1:m*n)
+#A = spdiagm(-1 => -ones(m - 1), 0 => 2.0 * ones(m), 1 => -ones(m - 1))
+#Omega = Domain(1:m)
+ A = Laplacian2d(m, n, 1, 1);
+ Omega = Domain(1:m*n)
 
 g = Graph(A)
 (initial_partition, decomposition) = create_partition(g, npart)
@@ -571,6 +570,20 @@ norm(vtest .- DVector2Vector(DVector(my_very_first_DDomain, vtest)))
 DA = DOperator(my_very_first_DDomain , A)
 
 DA.matvec(daaa)
+
+function test_mat_vec( A , v , domain )
+    Dv = DVector(domain,v)
+    DA = DOperator(domain , A)
+    DVector2Vector(DA.matvec(Dv))-A*v
+end
+
+
+test_mat_vec(A,aaa,my_very_first_DDomain)
+test_mat_vec(A,rand(length(my_very_first_DDomain.up)),my_very_first_DDomain)
+
+@test norm(test_mat_vec(A,rand(length(my_very_first_DDomain.up)),my_very_first_DDomain)) < 1.e-11
+
+
 
 Am1=DOperatorBlockJacobi(my_very_first_DDomain , A)
 Am1.matvec(daaa)

@@ -5,7 +5,7 @@
 #################################################
 # essai de partir du point de vue utilisateur
 # il existe qq part une numérotation globale
-using SparseArrays, LightGraphs, GraphPlot, Metis, LinearAlgebra, ThreadsX, Test
+using SparseArrays, LightGraphs, GraphPlot, Metis, LinearAlgebra, ThreadsX, Test, Plots
 
 """
 intersectalamatlab( a , b )
@@ -191,7 +191,7 @@ mutable struct DDomain
             res_overlaps[sdi] = (Dict{Domain,Tuple{Vector{Int64},Vector{Int64}}})()
             for sdj ∈ subdomains
                 if (sdi !== sdj)
-                    (sdisdj, kloc, kvois) = intersectalamatlab(global_indices(sdi), global_indices(sdj))
+                    @show (sdisdj, kloc, kvois) = intersectalamatlab(global_indices(sdi), global_indices(sdj))
                     if (!isempty(sdisdj))
                         res_overlaps[sdi][sdj] = (kloc, kvois)
                     end
@@ -291,10 +291,9 @@ import Base.copy
 function copy(DVec::DVector)
     res = DVector(DVec.domain, 0.0)
     for sdi ∈ subdomains(DVec)
-#        res_data[sdi] = copy(values(DVec,sdi))
-        res_data[sdi] .= values(DVec,sdi)
+        res.data[sdi] .= values(DVec,sdi)
     end
-    res = DVector(DVec.domain, res_data)
+    return res
 end
 
 
@@ -331,6 +330,9 @@ function DVector2Vector(DVect::DVector)
     return res
 end
 
+"""
+returns a decomposed vector R_i ∑_j R_j^T U_j
+"""
 function Update(DVec::DVector)
     res = DVector(DVec.domain, 0.0)
     for sd ∈ DVec.domain.subdomains
@@ -458,6 +460,9 @@ struct DOperatorBlockJacobi
 end
 
 """
+DOperatorBlockJacobi(DDomD, A)
+
+Returns direct local solvers for the Dirichlet matrices of a global matrix A
 # Arguments
 - 'DDomD'
 - 'A' : a square matrix given by its entries
@@ -473,7 +478,9 @@ function DOperatorBlockJacobi(DDomD, A)
         res = DVector( dom , 0. )
         # boucle parallelisable , Di a ajouter somewhere
         for sdi ∈ subdomains( res )
+            @show values(x , sdi)
            values(res , sdi) .= DA_lu[sdi]\ values(x , sdi)
+           @show values(res , sdi)
         end
         return res
      end
@@ -513,15 +520,15 @@ function Laplacian2d(Nx, Ny, Lx, Ly)
     return kron(spdiagm(0 => ones(Ny)), Ax) + kron(Ay, spdiagm(0 => ones(Nx)))
 end
 
- m = 9
+ m = 12
  n = 95
- npart = 3
+ npart = 2
 
 
-#A = spdiagm(-1 => -ones(m - 1), 0 => 2.0 * ones(m), 1 => -ones(m - 1))
-#Omega = Domain(1:m)
- A = Laplacian2d(m, n, 1, 1);
- Omega = Domain(1:m*n)
+A = spdiagm(-1 => -ones(m - 1), 0 => 2.0 * ones(m), 1 => -ones(m - 1))
+Omega = Domain(1:m)
+# A = Laplacian2d(m, n, 1, 1);
+# Omega = Domain(1:m*n)
 
 g = Graph(A)
 (initial_partition, decomposition) = create_partition(g, npart)
@@ -583,10 +590,37 @@ test_mat_vec(A,rand(length(my_very_first_DDomain.up)),my_very_first_DDomain)
 
 @test norm(test_mat_vec(A,rand(length(my_very_first_DDomain.up)),my_very_first_DDomain)) < 1.e-11
 
-
-
 Am1=DOperatorBlockJacobi(my_very_first_DDomain , A)
-Am1.matvec(daaa)
+#Am1.matvec(daaa)
+
+
+####### RAS iteratif  ###################
+# erreur qq part
+b = ones(length(Omega))
+solex=A\b
+sol = zeros(length(Omega))
+itmax = 100
+dsol = DVector(my_very_first_DDomain,sol)
+dres = zeros(my_very_first_DDomain)
+db = DVector(my_very_first_DDomain,b)
+
+for it in 1:itmax
+    global dsol , dres
+#    dres = dot_op( db , DA.matvec(dsol) , (-))
+    dres = DVector( my_very_first_DDomain , b - A * DVector2Vector(dsol))
+#    println("Norme du residu " , norm(DVector2Vector(dres)))
+    println("Norme du vrai residu " , norm( b-A*DVector2Vector(dsol) ) )
+    # correction
+    dcor = Am1.matvec(dres)
+    vuesur(dcor)
+    tmp2 = MakeCoherent(dcor)
+    tmp = copy(dsol)
+    tmp3 = dot_op(tmp , tmp2 , (+) )
+    dsol = MakeCoherent(tmp3)
+#    plot!(DVector2Vector(dsol))
+end
+
+
 
 # faire DOperator
 # faire des tests

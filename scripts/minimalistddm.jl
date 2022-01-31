@@ -312,11 +312,35 @@ end
 # Vincent --> ou surcharger broadcast
 
 
+"""
+MakeCoherent( dvector )
 
+Returns a coherent decomposed vector
+Using a Boolean partition of unity ensures that the result is roundoff error free and execution order independent
+# Argument
+- dvector : a decomposed vector
+"""
 function MakeCoherent(DVect::DVector)
     #Diboolean ensures that the result is roundoff error free
     return Update(dot_op(Diboolean(DVect.domain), DVect, (.*)))
 end
+
+
+"""
+MakeCoherent!( dvector )
+
+Makes a decomposed vector coherent
+Using a Boolean partition of unity ensures that the result is roundoff error free and execution order independent
+# Argument
+- dvector : a decomposed vector
+"""
+function MakeCoherent!(DVect::DVector)
+    #Diboolean ensures that the result is roundoff error free
+    tmp=copy(DVect)
+    Dvect = MakeCoherent(tmp)
+end
+
+
 
 function DVector2Vector(DVect::DVector)
     Dres = MakeCoherent(DVect)
@@ -606,17 +630,13 @@ db = DVector(my_very_first_DDomain,b)
 
 for it in 1:itmax
     global dsol , dres
-#    dres = dot_op( db , DA.matvec(dsol) , (-))
-    dres = DVector( my_very_first_DDomain , b - A * DVector2Vector(dsol))
-#    println("Norme du residu " , norm(DVector2Vector(dres)))
+    dres = dot_op( db , DA.matvec(dsol) , (-))
     println("Norme du vrai residu " , norm( b-A*DVector2Vector(dsol) ) )
     # correction
     dcor = Am1.matvec(dres)
     vuesur(dcor)
-    tmp2 = MakeCoherent(dcor)
-    tmp = copy(dsol)
-    tmp3 = dot_op(tmp , tmp2 , (+) )
-    dsol = MakeCoherent(tmp3)
+    MakeCoherent!(dcor)
+    dsol = dot_op(dsol , dcor , (+) )
 #    plot!(DVector2Vector(dsol))
 end
 

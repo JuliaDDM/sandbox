@@ -58,9 +58,6 @@ function create_partition(g, npart)
 end
 
 
-
-
-
 """
 create_partition_DDomain( Domain , g , npart )
 
@@ -191,7 +188,7 @@ mutable struct DDomain
             res_overlaps[sdi] = (Dict{Domain,Tuple{Vector{Int64},Vector{Int64}}})()
             for sdj ∈ subdomains
                 if (sdi !== sdj)
-                    @show (sdisdj, kloc, kvois) = intersectalamatlab(global_indices(sdi), global_indices(sdj))
+                    (sdisdj, kloc, kvois) = intersectalamatlab(global_indices(sdi), global_indices(sdj))
                     if (!isempty(sdisdj))
                         res_overlaps[sdi][sdj] = (kloc, kvois)
                     end
@@ -214,9 +211,9 @@ end
 #       struct DVector
 #
 #################################################
-mutable struct DVector
+mutable struct DVector{T}
     domain::DDomain
-    data::Dict{Domain,Vector{Float64}}
+    data::Dict{Domain,Vector{T}}
     # + , - , a* , .* , similar etc ... si on peut automatiquement hériter de ce qui vient de vecteur, on a gagné voir comment faire en Julia
     # boucles sur eval ??
     # ce qui est lié à l'aspect cohérent : prodscal et donc demande une partition de l'unite qulle quelle soit
@@ -233,10 +230,11 @@ function values(DVect::DVector, sd::Domain)
 end
 
 
-function DVector(ddomain::DDomain, initial_value::Float64)
-    data_res = Dict{Domain,Vector{Float64}}()
+function DVector(ddomain::DDomain, initial_value::T) where {T<:Number}
+    datatype = typeof(initial_value)
+    data_res = Dict{Domain,Vector{datatype}}()
     for sd ∈ ddomain.subdomains
-        data_res[sd] = zeros(Float64, length(global_indices(sd)))
+        data_res[sd] = zeros(datatype, length(global_indices(sd)))
         data_res[sd] .= initial_value
     end
     return DVector(ddomain, data_res)
@@ -263,7 +261,7 @@ Returns a decomposed vector built from a vector
 - 'domain' : the decomposed domain
 - 'vecsrc' : the classical vector
 """
-function DVector(ddomain::DDomain, Usrc)
+function DVector(ddomain::DDomain, Usrc::Vector{T}) where {T<:Number}
     if !(length(ddomain.up) == length(Usrc))
         error("Lengthes of decomposed domain and vector must match: $(length(ddomain.up)) is not $(length(Usrc)) ")
     end
@@ -502,9 +500,7 @@ function DOperatorBlockJacobi(DDomD, A)
         res = DVector( dom , 0. )
         # boucle parallelisable , Di a ajouter somewhere
         for sdi ∈ subdomains( res )
-            @show values(x , sdi)
            values(res , sdi) .= DA_lu[sdi]\ values(x , sdi)
-           @show values(res , sdi)
         end
         return res
      end
@@ -587,7 +583,7 @@ vuesur(Diboolean(my_very_first_DDomain))
 
 vuesur(Update(dot_op(Diboolean(my_very_first_DDomain), my_very_first_DVect, (.*))))
 
-aaa = collect(1:length(Omega))
+aaa = 1.0 * collect(1:length(Omega))
 
 daaa = DVector(my_very_first_DDomain, aaa)
 

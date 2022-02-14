@@ -571,6 +571,8 @@ aa = Update(my_very_first_DVect)
 bb = DVector(my_very_first_DDomain, 3.0)
 
 dot_op(aa, bb, (.*))
+// aa .* bb
+// Vincent: a ne pas faire mais plutôt ..* car en fait broadcast à deux niveaux
 
 my_very_first_Di = Di(my_very_first_DDomain)
 
@@ -638,9 +640,11 @@ end
 
 
 
-# faire DOperator
-# faire des tests
+# faire DOperator ok
+# faire des tests ok
 # paralleliser
-# commenter
+# compatibilité avec les librairies de méthodes de Krylov : cf LinearSolve -> ::invPrecondintioner ou on definit le prod mat vec au lieu de ldiv
+# deux niveaux - trois niveaux
+# commenter - unit test dossier test de la documentation de Julia 
 # a nettoyer,
 # a encapsuler, trop de references aux membres des structures???

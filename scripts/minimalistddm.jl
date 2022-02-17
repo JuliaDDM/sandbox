@@ -580,7 +580,7 @@ function Laplacian2d(Nx, Ny, Lx, Ly)
     return kron(spdiagm(0 => ones(Ny)), Ax) + kron(Ay, spdiagm(0 => ones(Nx)))
 end
 
- m = 120
+ m = 1000
  n = 950
  npart = 8
 
@@ -650,7 +650,8 @@ end
 test_mat_vec(A,aaa,my_very_first_DDomain)
 test_mat_vec(A,rand(length(my_very_first_DDomain.up)),my_very_first_DDomain)
 
-@test norm(test_mat_vec(A,rand(length(my_very_first_DDomain.up)),my_very_first_DDomain)) < 1.e-8
+# a regler pour etre vraiment zero
+@test norm(test_mat_vec(A,rand(length(my_very_first_DDomain.up)),my_very_first_DDomain)) < 1.e-6
 
 Am1=DOperatorBlockJacobi(my_very_first_DDomain , A)
 #Am1.matvec(daaa)
@@ -693,3 +694,20 @@ end
 # commenter - unit test dossier test de la documentation de Julia
 # a nettoyer,
 # a encapsuler, trop de references aux membres des structures???
+
+
+# julia> @btime DOperatorBlockJacobiTest(my_very_first_DDomain , A);
+#   895.837 ms (473 allocations: 938.20 MiB)
+#
+# julia> DOperatorBlockJacobiThreadedTest(my_very_first_DDomain , A);
+#
+# julia>  @btime DOperatorBlockJacobiThreadedTest(my_very_first_DDomain , A);
+#   4.794 s (626 allocations: 938.21 MiB)
+#
+# julia> @time solex=A\b;
+#   1.144653 seconds (82 allocations: 1000.510 MiB, 1.33% gc time)
+#
+# julia> DOperatorBlockJacobiThreadedTestuseless(my_very_first_DDomain , A);
+#
+# julia> @btime DOperatorBlockJacobiThreadedTestuseless(my_very_first_DDomain , A);
+#   4.062 s (576 allocations: 938.21 MiB)

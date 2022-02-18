@@ -5,7 +5,8 @@
 #################################################
 # essai de partir du point de vue utilisateur
 # il existe qq part une numérotation globale
-using SparseArrays, LightGraphs, GraphPlot, Metis, LinearAlgebra, ThreadsX, Test, Plots
+using SparseArrays, LightGraphs, GraphPlot, Plots , Metis, LinearAlgebra, ThreadsX, Test,   ThreadSafeDicts , BenchmarkTools
+
 
 """
 intersectalamatlab( a , b )
@@ -324,19 +325,19 @@ function MakeCoherent(DVect::DVector)
 end
 
 
-"""
-MakeCoherent!( dvector )
-
-Makes a decomposed vector coherent
-Using a Boolean partition of unity ensures that the result is roundoff error free and execution order independent
-# Argument
-- dvector : a decomposed vector
-"""
-function MakeCoherent!(DVect::DVector)
-    #Diboolean ensures that the result is roundoff error free
-    tmp=copy(DVect)
-    Dvect = MakeCoherent(tmp)
-end
+# """
+# MakeCoherent!( dvector )
+#
+# Makes a decomposed vector coherent BOGUE
+# Using a Boolean partition of unity ensures that the result is roundoff error free and execution order independent
+# # Argument
+# - dvector : a decomposed vector
+# """
+# function MakeCoherent!(DVect::DVector)
+#     #Diboolean ensures that the result is roundoff error free
+#     tmp=copy(DVect)
+#     Dvect = copy(MakeCoherent(tmp))
+# end
 
 
 
@@ -407,6 +408,15 @@ function vuesur(U::DVector)
     for sd ∈ subdomains(U)
         println(values(U, sd))
     end
+end
+
+
+function noncoherentrandDVector(ddomain::DDomain)
+    data_res = Dict{Domain,Vector{Float64}}()
+    for sd ∈ ddomain.subdomains
+        data_res[sd] = floor.(10. *rand( length(global_indices(sd)) ))
+    end
+    return DVector(ddomain, data_res)
 end
 
 
@@ -490,7 +500,14 @@ Returns direct local solvers for the Dirichlet matrices of a global matrix A
 - 'A' : a square matrix given by its entries
 """
 function DOperatorBlockJacobi(DDomD, A)
+    # DA_lu = ThreadSafeDict()
+    # ThreadsX.foreach(subdomains( DDomD ))  do sdi
+    #     #        for sdi ∈ subdomains(DDomD)
+    #     DA_lu[sdi] = factorize(A[global_indices(sdi), global_indices(sdi)]  )
+    # end
+
     DA_lu = Dict()
+#    ThreadsX.foreach(subdomains( DDomD ))  do sdi
     for sdi ∈ subdomains(DDomD)
         DA_lu[sdi] = factorize(A[global_indices(sdi), global_indices(sdi)]  )
     end
@@ -500,13 +517,36 @@ function DOperatorBlockJacobi(DDomD, A)
         res = DVector( dom , 0. )
         # boucle parallelisable , Di a ajouter somewhere
         for sdi ∈ subdomains( res )
-           values(res , sdi) .= DA_lu[sdi]\ values(x , sdi)
+            values(res , sdi) .= DA_lu[sdi]\ values(x , sdi)
         end
         return res
-     end
-     return DOperatorBlockJacobi( DDomD , DDomD , shared_mat_vec )
+    end
+    return DOperatorBlockJacobi( DDomD , DDomD , shared_mat_vec )
 end
 
+function DOperatorBlockJacobiThreadedTest(DDomD, A)
+    DA_lu = ThreadSafeDict()
+    ThreadsX.foreach(subdomains( DDomD ))  do sdi
+        #        for sdi ∈ subdomains(DDomD)
+        DA_lu[sdi] = factorize(A[global_indices(sdi), global_indices(sdi)]  )
+    end
+end
+
+function DOperatorBlockJacobiThreadedTestuseless(DDomD, A)
+    ThreadsX.foreach(subdomains( DDomD ))  do sdi
+        #        for sdi ∈ subdomains(DDomD)
+         factorize(A[global_indices(sdi), global_indices(sdi)]  )
+    end
+end
+
+
+function DOperatorBlockJacobiTest(DDomD, A)
+    DA_lu = Dict()
+#    ThreadsX.foreach(subdomains( DDomD ))  do sdi
+    for sdi ∈ subdomains(DDomD)
+        DA_lu[sdi] = factorize(A[global_indices(sdi), global_indices(sdi)]  )
+    end
+end
 
 
 #    Di  # la partition de l'unité locale au sous domaine vue comme un operateur local verifiant une certaine propriété
@@ -540,15 +580,15 @@ function Laplacian2d(Nx, Ny, Lx, Ly)
     return kron(spdiagm(0 => ones(Ny)), Ax) + kron(Ay, spdiagm(0 => ones(Nx)))
 end
 
- m = 12
- n = 95
- npart = 2
+ m = 1000
+ n = 950
+ npart = 8
 
 
-A = spdiagm(-1 => -ones(m - 1), 0 => 2.0 * ones(m), 1 => -ones(m - 1))
-Omega = Domain(1:m)
-# A = Laplacian2d(m, n, 1, 1);
-# Omega = Domain(1:m*n)
+# A = spdiagm(-1 => -ones(m - 1), 0 => 2.0 * ones(m), 1 => -ones(m - 1))
+# Omega = Domain(1:m)
+A = Laplacian2d(m, n, 1, 1);
+Omega = Domain(1:m*n)
 
 g = Graph(A)
 (initial_partition, decomposition) = create_partition(g, npart)
@@ -571,23 +611,25 @@ aa = Update(my_very_first_DVect)
 bb = DVector(my_very_first_DDomain, 3.0)
 
 dot_op(aa, bb, (.*))
+# aa .* bb
+# Vincent: a ne pas faire mais plutôt ..* car en fait broadcast à deux niveaux
 
 my_very_first_Di = Di(my_very_first_DDomain)
 
 zzz = Update(dot_op(my_very_first_Di, my_very_first_DVect, (.*)))
 
 
-vuesur(zzz)
+#vuesur(zzz)
 
-vuesur(Diboolean(my_very_first_DDomain))
+#vuesur(Diboolean(my_very_first_DDomain))
 
-vuesur(Update(dot_op(Diboolean(my_very_first_DDomain), my_very_first_DVect, (.*))))
+#vuesur(Update(dot_op(Diboolean(my_very_first_DDomain), my_very_first_DVect, (.*))))
 
 aaa = 1.0 * collect(1:length(Omega))
 
 daaa = DVector(my_very_first_DDomain, aaa)
 
-vuesur(Update(dot_op(Diboolean(my_very_first_DDomain), daaa, (.*))))
+#vuesur(Update(dot_op(Diboolean(my_very_first_DDomain), daaa, (.*))))
 
 DVector2Vector(daaa)
 
@@ -608,18 +650,18 @@ end
 test_mat_vec(A,aaa,my_very_first_DDomain)
 test_mat_vec(A,rand(length(my_very_first_DDomain.up)),my_very_first_DDomain)
 
-@test norm(test_mat_vec(A,rand(length(my_very_first_DDomain.up)),my_very_first_DDomain)) < 1.e-11
+# a regler pour etre vraiment zero
+@test norm(test_mat_vec(A,rand(length(my_very_first_DDomain.up)),my_very_first_DDomain)) < 1.e-6
 
 Am1=DOperatorBlockJacobi(my_very_first_DDomain , A)
 #Am1.matvec(daaa)
 
 
 ####### RAS iteratif  ###################
-# erreur qq part
 b = ones(length(Omega))
 solex=A\b
 sol = zeros(length(Omega))
-itmax = 100
+itmax = 600
 dsol = DVector(my_very_first_DDomain,sol)
 dres = zeros(my_very_first_DDomain)
 db = DVector(my_very_first_DDomain,b)
@@ -630,17 +672,42 @@ for it in 1:itmax
     println("Norme du vrai residu " , norm( b-A*DVector2Vector(dsol) ) )
     # correction
     dcor = Am1.matvec(dres)
-    vuesur(dcor)
-    MakeCoherent!(dcor)
-    dsol = dot_op(dsol , dcor , (+) )
+    #MakeCoherent!(dcor)
+    dtmp = MakeCoherent(dcor)
+#    dsol = dot_op(dsol , dcor , (+) )
+    dsol = dot_op(dsol , dtmp , (+) )
 #    plot!(DVector2Vector(dsol))
 end
 
 
+# @btime DOperatorBlockJacobiTest(my_very_first_DDomain , A);
 
-# faire DOperator
-# faire des tests
+# @btime DOperatorBlockJacobiThreadedTest(my_very_first_DDomain , A);
+
+# @btime DOperatorBlockJacobiThreadedTestuseless(my_very_first_DDomain , A);
+
+# faire DOperator ok
+# faire des tests ok
 # paralleliser
-# commenter
+# compatibilité avec les librairies de méthodes de Krylov : cf LinearSolve -> ::invPrecondintioner ou on definit le prod mat vec au lieu de ldiv
+# deux niveaux - trois niveaux
+# commenter - unit test dossier test de la documentation de Julia
 # a nettoyer,
 # a encapsuler, trop de references aux membres des structures???
+
+
+# julia> @btime DOperatorBlockJacobiTest(my_very_first_DDomain , A);
+#   895.837 ms (473 allocations: 938.20 MiB)
+#
+# julia> DOperatorBlockJacobiThreadedTest(my_very_first_DDomain , A);
+#
+# julia>  @btime DOperatorBlockJacobiThreadedTest(my_very_first_DDomain , A);
+#   4.794 s (626 allocations: 938.21 MiB)
+#
+# julia> @time solex=A\b;
+#   1.144653 seconds (82 allocations: 1000.510 MiB, 1.33% gc time)
+#
+# julia> DOperatorBlockJacobiThreadedTestuseless(my_very_first_DDomain , A);
+#
+# julia> @btime DOperatorBlockJacobiThreadedTestuseless(my_very_first_DDomain , A);
+#   4.062 s (576 allocations: 938.21 MiB)

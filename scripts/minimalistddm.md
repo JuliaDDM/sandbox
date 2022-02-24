@@ -44,3 +44,4 @@ Pour le DOperator
 3. vis à vis du séquentiel?
     1. Solutions: faire les opérations dans le même ordre ? via un surcoût garantir l'indépendance des résultats vis à vis de l'ordre de la somme (arithmétique compensée)
     2. voir les commentaires dans le code
+4. Numéroter les sous domaines de 0 à N-1?? 

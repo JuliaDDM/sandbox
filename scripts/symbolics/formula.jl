@@ -28,7 +28,7 @@ isfirst(dim, data, index...) =
 Differentiation.
 
 """
-δ(x, y) = y - x
+δ(y, x) = y - x
 
 """
 Forward differentiation.
@@ -44,7 +44,7 @@ function δ⁺(dim, data, index...)
     else
         y = zero(eltype(data))
     end
-    δ(x, y)
+    δ(y, x)
 end
 
 """
@@ -61,14 +61,14 @@ function δ⁻(dim, data, index...)
         x = zero(eltype(data))
     end
     y = getindex(data, index...)
-    δ(x, y)
+    δ(y, x)
 end
 
 """
 Interpolation.
 
 """
-σ(x, y) = (x + y) / 2
+σ(x, y) = x + y
 
 """
 Forward interpolation.
@@ -84,7 +84,7 @@ function σ⁺(dim, data, index...)
     else
         y = zero(eltype(data))
     end
-    σ(x, y)
+    σ(y, x)
 end
 
 """
@@ -101,7 +101,7 @@ function σ⁻(dim, data, index...)
         x = zero(eltype(data))
     end
     y = getindex(data, index...)
-    σ(x, y)
+    σ(y, x)
 end
 
 """
@@ -140,46 +140,45 @@ A = @variables A₁[1:6, 1:6] A₂[1:6, 1:6]
 @register_symbolic  μ(i, X::Arr{Num, 2})::Arr{Num, 2}
 
 # set capacities to 0 on boundaries
-A̅ = map(enumerate(A)) do (i, Aᵢ)
-    μ(i, Aᵢ)
+A̅ = map(eachindex(A)) do i
+    μ(i, A[i])
 end
 
-# volume-weighted gradient with Dirichlet B.C.
-G = map(enumerate(A̅)) do (i, C)
-#    ((δ⁻(i, σ⁺(i, C) .* T)) .- (σ⁻(i, (δ⁺(i, C)) .* D)))
-    δ⁻(i, σ⁺(i, C) .* T) .- σ⁻(i, δ⁺(i, C) .* D)
+# 2 x volume-weighted gradient (Dirichlet)
+G = map(eachindex(A̅)) do i
+    δ⁻(i, σ⁺(i, A̅[i]) .* T) .- σ⁻(i, δ⁺(i, A̅[i]) .* D)
 end
 
-# volume-weighted laplacian with Dirichlet B.C.
-Δ = mapreduce(+, enumerate(G)) do (i, C)
-#    (σ⁺(i, A̅[i])) .* (δ⁺(i, C ./ (σ⁻(i, V))))
-    σ⁺(i, A̅[i]) .* δ⁺(i, C ./ σ⁻(i, V))
+# 2 x volume-weighted laplacian with Dirichlet B.C.
+Δ = mapreduce(+, eachindex(G)) do i
+    σ⁺(i, A̅[i]) .* δ⁺(i, G[i] ./ σ⁻(i, V))
 end
 
 # generate all possible formulas
-"""
-For this to work src/num.jl from Symbolics.jl needs to be
-patched by adding:
-```julia
-<ₑ(s::Num, x::Real) = value(s) <ₑ value(x)
-<ₑ(s::Real, x::Num) = value(s) <ₑ value(x)
-```
-at line 111.
+formula = scalarize.(Δ)
 
-"""
-formula = scalarize(Δ)
-
-#=
 using Symbolics.Rewriters
 
 @variables i::Int j::Int
 
-fdm = map(CartesianIndices(formula)) do el
-    u, v = Tuple(el)
-    rule = @rule getindex(~x, ~s::isone, ~t::isone) => :($x[i, j])
-    Meta.parse(string(formula[el])) |>
-        Postwalk(Chain([rule])) |>
-        eval
+fdm = map(CartesianIndices(formula)) do outer
+    u, v = Tuple(outer)
+    rules = map(reshape(CartesianIndices((u-1:u+2, v-1:v+2)), :)) do inner
+        i, j = Tuple(inner)
+        @rule getindex(~x, $i, $j) => :($x[i+$(i-u), j+$(j-v)])
+    end
+    push!(rules, @rule(δ(~x...) => :((-)($(x...)))))
+    push!(rules, @rule(σ(~x...) => :((+)($(x...)))))
+    Meta.parse(string(formula[outer])) |>
+    Postwalk(Chain(rules)) |>
+    eval
+end
+
+#=
+fdm = substitute.(fdm, Ref(Dict(δ => -, σ => +)))
+
+fdm = map(fdm) do el
+    eval(rewrite(Meta.parse(string(el)), []))
 end
 =#
 

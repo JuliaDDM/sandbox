@@ -5,7 +5,7 @@
 #################################################
 # essai de partir du point de vue utilisateur
 # il existe qq part une numérotation globale
-using SparseArrays, LightGraphs, GraphPlot, Plots , Metis, LinearAlgebra, ThreadsX, Test,   ThreadSafeDicts , BenchmarkTools
+using SparseArrays, LightGraphs, GraphPlot, Plots , Metis, LinearAlgebra, ThreadsX, Test,  FLoops , ThreadSafeDicts , BenchmarkTools
 
 
 """
@@ -548,6 +548,14 @@ function DOperatorBlockJacobiTest(DDomD, A)
     end
 end
 
+function DOperatorBlockJacobiThreadedTestFloops(DDomD, A)
+    DA_lu = Dict()
+    @floop for sdi ∈ subdomains(DDomD)
+        # DA_lu[sdi] =
+         factorize(A[global_indices(sdi), global_indices(sdi)]  )
+    end
+end
+
 
 #    Di  # la partition de l'unité locale au sous domaine vue comme un operateur local verifiant une certaine propriété
 #  Di est définie sur un DDomain (constructeur) et on l'interroge en luio donnant un sous domaine et il renvoie le vecteur des poids D(Omage_i)
@@ -580,9 +588,9 @@ function Laplacian2d(Nx, Ny, Lx, Ly)
     return kron(spdiagm(0 => ones(Ny)), Ax) + kron(Ay, spdiagm(0 => ones(Nx)))
 end
 
- m = 1000
- n = 950
- npart = 8
+ m = 100
+ n = 400
+ npart = 40
 
 
 # A = spdiagm(-1 => -ones(m - 1), 0 => 2.0 * ones(m), 1 => -ones(m - 1))
@@ -659,9 +667,9 @@ Am1=DOperatorBlockJacobi(my_very_first_DDomain , A)
 
 ####### RAS iteratif  ###################
 b = ones(length(Omega))
-solex=A\b
+@time solex=A\b
 sol = zeros(length(Omega))
-itmax = 600
+itmax = 100
 dsol = DVector(my_very_first_DDomain,sol)
 dres = zeros(my_very_first_DDomain)
 db = DVector(my_very_first_DDomain,b)
@@ -679,12 +687,16 @@ for it in 1:itmax
 #    plot!(DVector2Vector(dsol))
 end
 
+@show npart
+ @show @btime DOperatorBlockJacobiTest(my_very_first_DDomain , A);
 
-# @btime DOperatorBlockJacobiTest(my_very_first_DDomain , A);
+@show @btime DOperatorBlockJacobiThreadedTest(my_very_first_DDomain , A);
 
-# @btime DOperatorBlockJacobiThreadedTest(my_very_first_DDomain , A);
+ @show @btime DOperatorBlockJacobiThreadedTestuseless(my_very_first_DDomain , A);
 
-# @btime DOperatorBlockJacobiThreadedTestuseless(my_very_first_DDomain , A);
+ @show @btime DOperatorBlockJacobiThreadedTestFloops(my_very_first_DDomain , A);
+
+
 
 # faire DOperator ok
 # faire des tests ok
@@ -694,20 +706,27 @@ end
 # commenter - unit test dossier test de la documentation de Julia
 # a nettoyer,
 # a encapsuler, trop de references aux membres des structures???
+# Passer de Dict à vector pour éviter les problèmes de race condition en parallèle?? 
 
 
+# npart = 8
 # julia> @btime DOperatorBlockJacobiTest(my_very_first_DDomain , A);
 #   895.837 ms (473 allocations: 938.20 MiB)
-#
-# julia> DOperatorBlockJacobiThreadedTest(my_very_first_DDomain , A);
 #
 # julia>  @btime DOperatorBlockJacobiThreadedTest(my_very_first_DDomain , A);
 #   4.794 s (626 allocations: 938.21 MiB)
 #
-# julia> @time solex=A\b;
-#   1.144653 seconds (82 allocations: 1000.510 MiB, 1.33% gc time)
-#
-# julia> DOperatorBlockJacobiThreadedTestuseless(my_very_first_DDomain , A);
-#
 # julia> @btime DOperatorBlockJacobiThreadedTestuseless(my_very_first_DDomain , A);
 #   4.062 s (576 allocations: 938.21 MiB)
+
+
+# npart = 80
+# 912.769 ms (4700 allocations: 1.36 GiB)
+# 2.761 s (5215 allocations: 1.36 GiB)
+# 2.757 s (5118 allocations: 1.36 GiB)
+
+
+# npart = 400
+#   951.615 ms (22583 allocations: 3.55 GiB)
+#   134.000 ms (23837 allocations: 3.55 GiB)
+#   178.366 ms (23732 allocations: 3.55 GiB)

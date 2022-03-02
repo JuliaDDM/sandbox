@@ -161,7 +161,7 @@ using Symbolics.Rewriters
 
 @variables i::Int j::Int
 
-fdm = map(CartesianIndices(formula)) do outer
+fdm0 = map(CartesianIndices(formula)) do outer
     u, v = Tuple(outer)
     rules = map(reshape(CartesianIndices((u-1:u+2, v-1:v+2)), :)) do inner
         i, j = Tuple(inner)
@@ -175,10 +175,46 @@ fdm = map(CartesianIndices(formula)) do outer
 end
 
 #=
-fdm = substitute.(fdm, Ref(Dict(δ => -, σ => +)))
+fdm0 = substitute.(fdm0, Ref(Dict(δ => -, σ => +)))
 
-fdm = map(fdm) do el
+fdm0 = map(fdm0) do el
     eval(rewrite(Meta.parse(string(el)), []))
 end
 =#
 
+function removezeros(x::AbstractMatrix)
+    low, up = Vector{Int}(undef, 2), Vector{Int}(undef, 2)
+    #
+    low[1] = all(iszero, x[begin, :])
+    up[1] = all(iszero, x[end, :])
+    #
+    low[2] = all(iszero, x[:, begin])
+    up[2] = all(iszero, x[:, end])
+    #
+    inds = map(axes(x), low, up) do axis, l, u
+        axis[begin + l:end - u]
+    end
+    #
+    x[inds...], low, up
+end
+
+function foo(x, low, up)
+    all(isone, size(x)) && return x, low, up
+
+    inner = map(axes(x)) do axis
+        axis[begin + 1:end - 1]
+    end
+    low .+= 1
+    up .+= 1
+    foo(x[inner...], low, up)
+end
+
+fdm, low, up = foo(removezeros(fdm0)...)
+
+function bar(x::AbstractMatrix)
+    block = Expr(:block)
+
+    y, low, up = removezeros(fdm0)
+
+    block
+end

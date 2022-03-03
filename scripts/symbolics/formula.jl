@@ -126,12 +126,16 @@ using Symbolics
 import Symbolics: Arr, scalarize
 
 A = @variables A₁[1:6, 1:6] A₂[1:6, 1:6]
+M = @variables M₁[1:6, 1:6] M₂[1:6, 1:6]
 @variables T[1:6, 1:6]
 @variables D[1:6, 1:6]
+@variables G[1:6, 1:6]
+@variables H[1:6, 1:6]
 @variables V[1:6, 1:6]
 
 @register_symbolic δ(x::Real, y::Real)::Real
 @register_symbolic σ(x::Real, y::Real)::Real
+@register_symbolic not(x::Real)::Real
 
 @register_symbolic δ⁻(i, X::Arr{Num, 2})::Arr{Num, 2}
 @register_symbolic δ⁺(i, X::Arr{Num, 2})::Arr{Num, 2}
@@ -144,18 +148,36 @@ A̅ = map(eachindex(A)) do i
     μ(i, A[i])
 end
 
-# 2 x volume-weighted gradient (Dirichlet)
-G = map(eachindex(A̅)) do i
-    δ⁻(i, σ⁺(i, A̅[i]) .* T) .- σ⁻(i, δ⁺(i, A̅[i]) .* D)
-end
+# 2 x volume-weighted gradient (Dirichlet B. C.)
+Gᴰ = map(eachindex(A̅)) do i
+    (δ⁻(i, σ⁺(i, A̅[i]) .* T) .- σ⁻(i, δ⁺(i, A̅[i]) .* D)) ./ σ⁻(i, V)
+end .|> scalarize
 
-# 2 x volume-weighted laplacian with Dirichlet B.C.
-Δ = mapreduce(+, eachindex(G)) do i
-    σ⁺(i, A̅[i]) .* δ⁺(i, G[i] ./ σ⁻(i, V))
-end
+# 2 x volume-weighted gradient (Neumann B. C.)
+Gᴺ = map(eachindex(A̅)) do i
+    (A̅[i] .* δ⁻(i, T) - σ⁻(i, δ⁺(i, A̅[i]) .* G .* H)) ./ σ⁻(i, V)
+end .|> scalarize
+
+# 2 x volume-weighted laplacian (Neumann B. C.)
+Δᴺ = mapreduce(+, eachindex(A̅)) do i
+    δ⁺(i, A̅[i] .* Gᴺ[i]) .- δ⁺(i, A̅[i]) .* G
+end |> scalarize
+
+# 2 x volume-weighted laplacian (Dirichlet B. C.)
+Δᴰ = mapreduce(+, eachindex(A̅)) do i
+    σ⁺(i, A̅[i]) .* δ⁺(i, Gᴰ[i])
+end |> scalarize
+
+# Mixed B. C.
+Δ = mapreduce(+, eachindex(A̅)) do i
+    δ⁺(i, A̅[i] .* (M[i] .* Gᴺ[i] .+ not.(M[i]) .* Gᴰ[i])) .-
+    δ⁺(i, A̅[i]) .* (M[i] .* G .+ not.(M[i]) .* σ⁺(i, Gᴰ[i]))
+end |> scalarize
 
 # generate all possible formulas
-formula = scalarize.(Δ)
+#formula = scalarize.(Δᴰ)
+#formula = scalarize(Δᴰ)
+formula = Δᴰ
 
 using Symbolics.Rewriters
 
@@ -218,3 +240,11 @@ function bar(x::AbstractMatrix)
 
     block
 end
+
+function baz(low, up, expr)
+    lower = Expr(:call, :+, :begin, low)
+    upper = Expr(:call, :-, :end, up)
+    rng = Expr(:call, :(:), lower, upper)
+    Expr(:ref, expr, rng)
+end
+

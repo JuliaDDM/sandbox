@@ -241,10 +241,57 @@ function bar(x::AbstractMatrix)
     block
 end
 
-function baz(low, up, expr)
+function baz(low::Int, up::Int, expr)
     lower = Expr(:call, :+, :begin, low)
     upper = Expr(:call, :-, :end, up)
     rng = Expr(:call, :(:), lower, upper)
     Expr(:ref, expr, rng)
 end
+
+baz(1, 1, :(Base.OneTo(32)))
+
+baz(::typeof(+)) = :begin
+baz(::typeof(-)) = :end
+
+function baz(shift::Int, dir::Function, expr)
+    (shift == 0 && dir == +) && return Expr(:call, :first, expr)
+    (shift == 0 && dir == -) && return Expr(:call, :last, expr)
+    index = Expr(:call, Symbol(dir), baz(dir), shift)
+    Expr(:ref, expr, index)
+end
+
+function toexpr(n, low, up, axis)
+    n == 1 && return [baz(low, up, axis)]
+
+    vcat(baz(low, +, axis),
+         toexpr(n-2, low+1, up+1, axis),
+         baz(up, -, axis))
+end
+
+toexpr(5, 0, 1, :(axes(a, 1)))
+
+using TiledIteration
+
+outerrange = CartesianIndices((1:6, 1:6))
+innerrange = CartesianIndices((3:3, 3:3))
+
+for I in EdgeIterator(outerrange, innerrange)
+    @show I
+end
+
+left(expr, iter) = map(iter) do i
+    i == 0 && return :(first($expr))
+    :($expr[begin + $i])
+end
+
+right(expr, iter) = map(reverse(iter)) do i
+    i == 0 && return :(last($expr))
+    :($expr[end - $i])
+end
+#
+#function middle(expr, i, j)
+#
+#end
+
+vcat(left(:x, 0:1), right(:x, 0:2))
 

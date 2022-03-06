@@ -288,10 +288,47 @@ right(expr, iter) = map(reverse(iter)) do i
     i == 0 && return :(last($expr))
     :($expr[end - $i])
 end
-#
-#function middle(expr, i, j)
-#
-#end
 
-vcat(left(:x, 0:1), right(:x, 0:2))
+middle(expr, i, j) = :($expr[begin + $i, end - $j])
+
+vcat(left(:x, 0:1), middle(:x, 2, 3), right(:x, 0:2))
+
+function build_partition(expr, n, p = (n+1) ÷ 2)
+    left = map(0:p-2) do i
+        i == 0 && return :(first($expr))
+        :($expr[begin + $i])
+    end
+
+    middle = :($expr[begin + $(p-1), end - $(n-p)])
+
+    right = map(reverse(0:n-p-1)) do i
+        i == 0 && return :(last($expr))
+        :($expr[end - $i])
+    end
+
+    vcat(left, middle, right)
+end
+
+part = map(eachindex(A)) do i
+    build_partition(:(Base.OneTo(n[$i])), 6)
+end
+
+ranges = collect(product(part...))
+
+function build_loop(rng, expr, sym)
+    quote
+        for j in $(rng[2])
+            for i in $(rng[1])
+                $sym[i, j] = $expr
+            end
+        end
+    end
+end
+
+res = Base.remove_linenums!.(build_loop.(ranges, fdm0, Ref(:y)))
+
+reduce(res, init=Expr(:block)) do x, y
+    push!(x.args, first(y.args))
+    x
+end
 

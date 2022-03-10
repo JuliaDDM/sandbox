@@ -454,7 +454,8 @@ function DOperator(DDomD, A)
         res = zeros(dom)
         y = zeros(dom)
         #Diboolean pour avoir plus de reproductibilité?
-        di = Di( dom )
+#        di = Di( dom )
+        di = Diboolean( dom )
         for sdi ∈ subdomains( dom )
             values( y , sdi ) .= values(di,sdi) .* values(x,sdi)
         end
@@ -549,9 +550,10 @@ function DOperatorBlockJacobiTest(DDomD, A)
 end
 
 function DOperatorBlockJacobiThreadedTestFloops(DDomD, A)
-    DA_lu = Dict()
+#    DA_lu = Dict()
+    DA_lu = ThreadSafeDict()
     @floop for sdi ∈ subdomains(DDomD)
-        # DA_lu[sdi] =
+         DA_lu[sdi] =
          factorize(A[global_indices(sdi), global_indices(sdi)]  )
     end
 end
@@ -588,9 +590,9 @@ function Laplacian2d(Nx, Ny, Lx, Ly)
     return kron(spdiagm(0 => ones(Ny)), Ax) + kron(Ay, spdiagm(0 => ones(Nx)))
 end
 
- m = 100
+ m = 1000
  n = 400
- npart = 40
+ npart = 400
 
 
 # A = spdiagm(-1 => -ones(m - 1), 0 => 2.0 * ones(m), 1 => -ones(m - 1))
@@ -654,11 +656,20 @@ function test_mat_vec( A , v , domain )
     DVector2Vector(DA.matvec(Dv))-A*v
 end
 
+function test_mat_vecreproductible( A , v , domain )
+    Dv = DVector(domain,v)
+    Dv2 = DVector(domain,v)
+    DA = DOperator(domain , A)
+    DVector2Vector(DA.matvec(Dv))-DVector2Vector(DA.matvec(Dv2))
+end
+
 
 test_mat_vec(A,aaa,my_very_first_DDomain)
 test_mat_vec(A,rand(length(my_very_first_DDomain.up)),my_very_first_DDomain)
 
-# a regler pour etre vraiment zero
+# a regler pour etre vraiment zero ==> PRIORITAIRE
+# en fait en l'absence de parallélisme la fonction est forcément reproductible
+# par contre elle ne coincide pas forcément avec la version séquentielle 
 @test norm(test_mat_vec(A,rand(length(my_very_first_DDomain.up)),my_very_first_DDomain)) < 1.e-6
 
 Am1=DOperatorBlockJacobi(my_very_first_DDomain , A)
@@ -669,7 +680,7 @@ Am1=DOperatorBlockJacobi(my_very_first_DDomain , A)
 b = ones(length(Omega))
 @time solex=A\b
 sol = zeros(length(Omega))
-itmax = 100
+itmax = 20
 dsol = DVector(my_very_first_DDomain,sol)
 dres = zeros(my_very_first_DDomain)
 db = DVector(my_very_first_DDomain,b)
@@ -677,7 +688,7 @@ db = DVector(my_very_first_DDomain,b)
 for it in 1:itmax
     global dsol , dres
     dres = dot_op( db , DA.matvec(dsol) , (-))
-    println("Norme du vrai residu " , norm( b-A*DVector2Vector(dsol) ) )
+    println("Norme du vrai residu " , norm( b-A*DVector2Vector(dsol) ) , " at iteration " , it )
     # correction
     dcor = Am1.matvec(dres)
     #MakeCoherent!(dcor)
@@ -687,6 +698,7 @@ for it in 1:itmax
 #    plot!(DVector2Vector(dsol))
 end
 
+if (0>1)
 @show npart
  @show @btime DOperatorBlockJacobiTest(my_very_first_DDomain , A);
 
@@ -695,6 +707,7 @@ end
  @show @btime DOperatorBlockJacobiThreadedTestuseless(my_very_first_DDomain , A);
 
  @show @btime DOperatorBlockJacobiThreadedTestFloops(my_very_first_DDomain , A);
+end
 
 
 
@@ -706,7 +719,14 @@ end
 # commenter - unit test dossier test de la documentation de Julia
 # a nettoyer,
 # a encapsuler, trop de references aux membres des structures???
-# Passer de Dict à vector pour éviter les problèmes de race condition en parallèle?? 
+# Passer de Dict à vector pour éviter les problèmes de race condition en parallèle??
+
+# Dictionnaire et //
+# melanger Dict() et floops => risque de conflit en écriture
+#        ThreadSafeDict
+#   s'avouer vaincu et transferer le dictionnair en deux vecteurs
+#  /!\  Floops (basé sur Thread statique ) vs ThreadsX (Thread dynamique)
+#  restons sur ThreadsX et regardons Floops
 
 
 # npart = 8
@@ -730,3 +750,7 @@ end
 #   951.615 ms (22583 allocations: 3.55 GiB)
 #   134.000 ms (23837 allocations: 3.55 GiB)
 #   178.366 ms (23732 allocations: 3.55 GiB)
+
+ @test norm(test_mat_vec(A,rand(length(my_very_first_DDomain.up)),my_very_first_DDomain)) < 1.e-6
+
+  @test norm(test_mat_vecreproductible(A,rand(length(my_very_first_DDomain.up)),my_very_first_DDomain)) < 1.e-6

@@ -135,9 +135,9 @@ end
 # |                   |
 # |                   |
 # |                   |
-# alpha*u ---------> alpha*Du
-# A*u -------------> DA*Du
-# (u,v) -----------> (Du,Dv)= ∑_i (Ui,Di V_i)
+# alpha*u ---------> alpha*Du (a faire)
+# A*u -------------> DA*Du (fait)
+# (u,v) -----------> (Du,Dv)= ∑_i (Ui,Di V_i) (a faire)
 # ASM independant de la partition de l'unite
 # vecteur global <- vecteur partage coherent
 #
@@ -185,7 +185,7 @@ mutable struct DDomain
     # sd --> (subdomain_vois --> vecteur ( k_loc , k_vois ))
     DDomain(up::Domain, subdomains::Set{Domain}) = (
         res_overlaps = Dict{Domain,Dict{Domain,Tuple{Vector{Int64},Vector{Int64}}}}();
-        for sdi ∈ subdomains
+        for sdi ∈ subdomains # algo en N^2 faire mieux avec des boundinng box (mais lesquelles?)
             res_overlaps[sdi] = (Dict{Domain,Tuple{Vector{Int64},Vector{Int64}}})()
             for sdj ∈ subdomains
                 if (sdi !== sdj)
@@ -472,10 +472,7 @@ function DOperator(DDomD, A)
               end
            end
         end
-        # 1) qu'en est il de la cohérence du vecteur resultat (à faire avec une partition booleenne Dib
-        # 2) de l'indépendance vis à vis de l'ordre d'éxecution en // (reproductibilité en cause) 3) vis à vis du séquentiel?
-        # Solutions: faire les opérations dans le même ordre ? via un surcoût garantir l'indépendance des résultats vis à vis de l'ordre de la somme (arithmétique compensée)
-        return MakeCoherent(res)#manque la reproductibilité
+        return MakeCoherent(res)
      end
      return DOperator( DDomD , DDomD , shared_mat_vec )
 end
@@ -590,9 +587,9 @@ function Laplacian2d(Nx, Ny, Lx, Ly)
     return kron(spdiagm(0 => ones(Ny)), Ax) + kron(Ay, spdiagm(0 => ones(Nx)))
 end
 
- m = 1000
- n = 400
- npart = 400
+ m = 100
+ n = 40
+ npart = 8
 
 
 # A = spdiagm(-1 => -ones(m - 1), 0 => 2.0 * ones(m), 1 => -ones(m - 1))
@@ -653,7 +650,7 @@ DA.matvec(daaa)
 function test_mat_vec( A , v , domain )
     Dv = DVector(domain,v)
     DA = DOperator(domain , A)
-    DVector2Vector(DA.matvec(Dv))-A*v
+    norm(DVector2Vector(DA.matvec(Dv))-A*v)/norm(A*v)
 end
 
 function test_mat_vecreproductible( A , v , domain )
@@ -669,7 +666,7 @@ test_mat_vec(A,rand(length(my_very_first_DDomain.up)),my_very_first_DDomain)
 
 # a regler pour etre vraiment zero ==> PRIORITAIRE
 # en fait en l'absence de parallélisme la fonction est forcément reproductible
-# par contre elle ne coincide pas forcément avec la version séquentielle 
+# par contre elle ne coincide pas forcément avec la version séquentielle
 @test norm(test_mat_vec(A,rand(length(my_very_first_DDomain.up)),my_very_first_DDomain)) < 1.e-6
 
 Am1=DOperatorBlockJacobi(my_very_first_DDomain , A)
@@ -713,7 +710,8 @@ end
 
 # faire DOperator ok
 # faire des tests ok
-# paralleliser
+# séparer en modules pour avoir un code principal plus léger, voir julialang modules
+# paralleliser le produit matrice vecteur
 # compatibilité avec les librairies de méthodes de Krylov : cf LinearSolve -> ::invPrecondintioner ou on definit le prod mat vec au lieu de ldiv
 # deux niveaux - trois niveaux
 # commenter - unit test dossier test de la documentation de Julia
@@ -727,6 +725,7 @@ end
 #   s'avouer vaincu et transferer le dictionnair en deux vecteurs
 #  /!\  Floops (basé sur Thread statique ) vs ThreadsX (Thread dynamique)
 #  restons sur ThreadsX et regardons Floops
+#
 
 
 # npart = 8
@@ -751,6 +750,6 @@ end
 #   134.000 ms (23837 allocations: 3.55 GiB)
 #   178.366 ms (23732 allocations: 3.55 GiB)
 
- @test norm(test_mat_vec(A,rand(length(my_very_first_DDomain.up)),my_very_first_DDomain)) < 1.e-6
+ @test norm(test_mat_vec(A,rand(length(my_very_first_DDomain.up)),my_very_first_DDomain)) < 1.e-9
 
-  @test norm(test_mat_vecreproductible(A,rand(length(my_very_first_DDomain.up)),my_very_first_DDomain)) < 1.e-6
+ @test norm(test_mat_vecreproductible(A,rand(length(my_very_first_DDomain.up)),my_very_first_DDomain)) == 0.

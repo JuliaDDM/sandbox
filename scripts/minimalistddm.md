@@ -27,6 +27,7 @@ For making it useful for a decomposed vector, see [Decomposed vector](#Decompose
 
 A FAIRE POUR CLARIFIER:
 - [ ] ajouter la possibilité d'indexer avec des indices cartésiens pour débloquer les confusions liées à la numérotation
+- Le coût actuel du calcul des intersections est $N^2$. Avoir mieux cf. PETSc? 
 
 
 
@@ -38,10 +39,5 @@ A FAIRE POUR CLARIFIER:
 
 
 **A FAIRE PLUS TARD**
-Pour le DOperator 
-1. qu'en est il de la cohérence du vecteur resultat (à faire avec une partition booleenne Dib
-2. de l'indépendance vis à vis de l'ordre d'éxecution en // (reproductibilité en cause) 
-3. vis à vis du séquentiel?
-    1. Solutions: faire les opérations dans le même ordre ? via un surcoût garantir l'indépendance des résultats vis à vis de l'ordre de la somme (arithmétique compensée)
-    2. voir les commentaires dans le code
-4. Numéroter les sous domaines de 0 à N-1?? 
+
+

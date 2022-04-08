@@ -54,6 +54,12 @@ mutable struct DDomain
     )
 end
 
+# pour eviter le N^2,
+    # l'intersection est symétrique !!!
+    # accélérer le ci dessus avec une boudning box basée sur le min et max des indices
+    # plus imbriquer les choses via par exemple l'algorithme d'inflation (cf. matrice adjacence)
+    # ne parcourir que les points ajoutés à un sous domaine (N^2 reste mais moins de taches par couple de sous domaines)
+
 function subdomains(domain::DDomain)
     return domain.subdomains
 end

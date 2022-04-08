@@ -4,7 +4,7 @@
 
 From a domain $\Omega$ having $n$ d.o.fs, we can create a subdomain $\Omega_i$ having $n_i$ d.o.f.s. This subdomain is seen as a domain which is characterized by two things:
 1. its parent domain, here $\Omega$, in the code it is referred to as **up**. 
-2. an injection $f_i : [1:n_i] \mapsto {\mathcal N}_i$ where ${\mathcal N}_i$ is the set of degrees of freedom of the subdomain. In the code this injection is stored as a vector called **loctoglob**, that is $$\text{loctoglob} = [f_i(1),\,f_i(2) ,\, \ldots,\, f_i(n_i) ]\,.$$  
+2. a one-to-one map $f_i : [1:n_i] \mapsto {\mathcal N}_i$ where ${\mathcal N}_i$ is the set of degrees of freedom of the subdomain. In the code this map is stored as a vector called **loctoglob**, that is $$\text{loctoglob} = [f_i(1),\,f_i(2) ,\, \ldots,\, f_i(n_i) ]\,.$$  
 
 
 **Note** When a domain is not a subdomain, its parent **up** is itself and the vector **loctoglob** refers to a set of degrees of freedom, usually simply the range $[1:n]$. 

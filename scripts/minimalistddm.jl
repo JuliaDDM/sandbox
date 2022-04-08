@@ -228,7 +228,7 @@ end
 # commenter - unit test dossier test de la documentation de Julia
 # a nettoyer,
 # a encapsuler, trop de references aux membres des structures???
-# Passer de Dict à vector pour éviter les problèmes de race condition en parallèle??
+# Passer de Dict à vector pour éviter les problèmes de race condition en parallèle => si sous domaines petits, cela risque c'etre penalisant, regarder enumerate pour avoir une syntaxe  ??
 
 # Dictionnaire et //
 # melanger Dict() et floops => risque de conflit en écriture
@@ -236,7 +236,8 @@ end
 #   s'avouer vaincu et transferer le dictionnair en deux vecteurs
 #  /!\  Floops (basé sur Thread statique ) vs ThreadsX (Thread dynamique)
 #  restons sur ThreadsX et regardons Floops
-#
+# SUPPRIMER les ThreadSafeDict car inutiles ou bien quand utilisés en lecture passer au Dict normaux?? ??
+## REFAIRE le point sur les dictionnaires
 
 
 # npart = 8

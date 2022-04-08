@@ -16,8 +16,22 @@
 # somme compensée pour etre plus stable vis a vis des erreurs d'arrondi  -->
 #       -->  CF MakeCoherent si partition de l'unite non Booleenne ou Gradient conjugue (aussi???) ?
 
+# # Vincent--> pour changer facilement de dictionnaire
+# struct MyDict{K,V,T<:AbstractDict{K,V}} <: AbstractDict{K, V}
+#     dict::T
+# end
+# # commenter une des deux lignes
+# MyDict{K,V}() where {K,V} = MyDict(Dict{K,V}())
+#
+# MyDict{K,V}() where {K,V} = MyDict(ThreadSafeDict{K,V}())
+#
+# # Dict --> MyDict dans le code
+# # pour eviter de redefinir toutes les fcts de Dict
+# Base.parent(d::MyDict) = d.dict
 
-
+##ou plus simplement, a la typedef C:
+# const MyDict{K,V} = Dict{K,V}
+# const MyDict{K,V} = ThreadSafeDict{K,V}
 
 #################################################
 #

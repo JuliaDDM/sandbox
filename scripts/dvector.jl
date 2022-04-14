@@ -1,4 +1,3 @@
-
 #################################################
 #
 #       struct DVector
@@ -6,7 +5,7 @@
 #################################################
 mutable struct DVector{T}
     domain::DDomain
-    data::ThreadSafeDict{Domain,Vector{T}}
+    data::MyDict{Domain,Vector{T}}
     # ATTENTION : le choix ThreadSafeDict vs. Dict influe les autres fonctions
     # + , - , a* , .* , similar etc ... si on peut automatiquement hériter de ce qui vient de vecteur, on a gagné voir comment faire en Julia
     # boucles sur eval ??
@@ -26,11 +25,14 @@ end
 
 function DVector(ddomain::DDomain, initial_value::T) where {T<:Number}
     datatype = typeof(initial_value)
-    data_res = ThreadSafeDict{Domain,Vector{datatype}}()
+    data_res = MyDict{Domain,Vector{datatype}}()
     #data_res = Dict{Domain,Vector{datatype}}()
     ThreadsX.foreach( ddomain.subdomains )  do sd
     #for sd ∈ ddomain.subdomains
         data_res[sd] = zeros(datatype, length(global_indices(sd)))
+    end
+    #is actually lockfree since the value of the dictionnary have been allocated just above
+    ThreadsX.foreach( ddomain.subdomains )  do sd
         data_res[sd] .= initial_value
     end
     return DVector(ddomain, data_res)
@@ -40,8 +42,9 @@ import Base.ones, Base.zeros , Base.rand
 for sym in [ :ones , :zeros , :rand ]
     @eval function $(Symbol(string(sym)))(ddomain::DDomain)
         # Float64 should be inferred automatically
-        data_res = ThreadSafeDict{Domain,Vector{Float64}}()
-        for sd ∈ ddomain.subdomains
+        data_res = MyDict{Domain,Vector{Float64}}()
+        ThreadsX.foreach( ddomain.subdomains )  do sd
+#        for sd ∈ ddomain.subdomains
             #here as well
             data_res[sd] = $sym( length(global_indices(sd)) )
         end
@@ -75,7 +78,8 @@ import  Base.similar
 for sym in [ :similar   ]
     @eval function $(Symbol(string(sym)))(a::DVector)
         res = DVector(a.domain, 0.0)
-        for sd ∈ subdomains(res)
+        ThreadsX.foreach( subdomains(res) )  do sd
+#        for sd ∈ subdomains(res)
             values(res, sd) .=  $sym( values(a,sd) )
         end
         return res
@@ -145,6 +149,7 @@ function DVector2Vector(DVect::DVector)
     res = zeros(Float64, length(ddomain.up))
     #peu compatible avec une parallelisation
     #il faudrait differencier selon que Diboolean est zero ou non
+    # si je mets ThreadSafeDict ici, j'ai une erreur à l'execution. => strange ??
     for (sd, val) ∈ Dres.data
         res[global_indices(sd)] .= val
     end
@@ -156,10 +161,12 @@ returns a decomposed vector R_i ∑_j R_j^T U_j
 """
 function Update(DVec::DVector)
     res = DVector(DVec.domain, 0.0)
-    for sd ∈ DVec.domain.subdomains
+    ThreadsX.foreach( DVec.domain.subdomains )  do sd
+#    for sd ∈ DVec.domain.subdomains
         res.data[sd] .= DVec.data[sd]
     end
-    for sd ∈ DVec.domain.subdomains
+    ThreadsX.foreach( DVec.domain.subdomains )  do sd
+#    for sd ∈ DVec.domain.subdomains
         for sdvois ∈ DVec.domain.overlaps[sd]
             res.data[sd][sdvois.second[1]] .+= DVec.data[sdvois.first][sdvois.second[2]]
         end
@@ -193,7 +200,8 @@ returns a decomposed vector that corresponds to a Boolean partition of unity fun
 function Diboolean(domain::DDomain)
     res = DVector(domain, 1.0)
     vector_of_subdomains = collect(subdomains(domain))
-    for (i, sd) ∈ enumerate(vector_of_subdomains)
+    ThreadsX.foreach( enumerate(vector_of_subdomains) )  do (i, sd)
+#    for (i, sd) ∈ enumerate(vector_of_subdomains)
         for sdvois ∈ intersect(vector_of_subdomains[i+1:end], collect(keys(domain.overlaps[sd])))
             res.data[sdvois][domain.overlaps[sd][sdvois][2]] .= 0.0
         end
@@ -210,8 +218,9 @@ end
 
 
 function noncoherentrandDVector(ddomain::DDomain)
-    data_res = ThreadSafeDict{Domain,Vector{Float64}}()
-    for sd ∈ ddomain.subdomains
+    data_res = MyDict{Domain,Vector{Float64}}()
+    ThreadsX.foreach( ddomain.subdomains )  do sd
+#    for sd ∈ ddomain.subdomains
         data_res[sd] = floor.(10. *rand( length(global_indices(sd)) ))
     end
     return DVector(ddomain, data_res)

@@ -32,6 +32,7 @@
 ##ou plus simplement, a la typedef C:
 # const MyDict{K,V} = Dict{K,V}
 # const MyDict{K,V} = ThreadSafeDict{K,V}
+# la vraie perte avec les ThreadSafeDict est éventuellement "aux allocations des clès"
 
 #################################################
 #
@@ -55,11 +56,12 @@ end
 - 'A' : a square matrix given by its entries
 """
 function DOperator(DDomD, A)
-    DA =  ThreadSafeDict{Tuple{Domain,Domain},SparseMatrixCSC{Float64,Int64}}()
+    DA =  MyDict{Tuple{Domain,Domain},SparseMatrixCSC{Float64,Int64}}()
 #    DA = Dict{Tuple{Domain,Domain},SparseMatrixCSC{Float64,Int64}}()
     ThreadsX.foreach(subdomains( DDomD ))  do sdi
 #    for sdi ∈ subdomains(DDomD)
-        for sdj ∈ subdomains(DDomD)
+        ThreadsX.foreach(subdomains( DDomD ))  do sdj
+#        for sdj ∈ subdomains(DDomD)
             DA[(sdi, sdj)] = A[global_indices(sdi), global_indices(sdj)]
         end
     end
@@ -102,7 +104,7 @@ end
 - 'A' : a square matrix given by its entries
 """
 function DOperatorSequential(DDomD, A)
-    DA = Dict{Tuple{Domain,Domain},SparseMatrixCSC{Float64,Int64}}()
+    DA = MyDict{Tuple{Domain,Domain},SparseMatrixCSC{Float64,Int64}}()
     for sdi ∈ subdomains(DDomD)
         for sdj ∈ subdomains(DDomD)
             DA[(sdi, sdj)] = A[global_indices(sdi), global_indices(sdj)]
@@ -165,9 +167,9 @@ function DOperatorBlockJacobi(DDomD, A)
     #     DA_lu[sdi] = factorize(A[global_indices(sdi), global_indices(sdi)]  )
     # end
 
-    DA_lu = Dict()
-#    ThreadsX.foreach(subdomains( DDomD ))  do sdi
-    for sdi ∈ subdomains(DDomD)
+    DA_lu = MyDict()
+    ThreadsX.foreach(subdomains( DDomD ))  do sdi
+#    for sdi ∈ subdomains(DDomD)
         DA_lu[sdi] = factorize(A[global_indices(sdi), global_indices(sdi)]  )
     end
 
@@ -175,7 +177,8 @@ function DOperatorBlockJacobi(DDomD, A)
         dom = x.domain
         res = DVector( dom , 0. )
         # boucle parallelisable , Di a ajouter somewhere
-        for sdi ∈ subdomains( res )
+        ThreadsX.foreach( subdomains( res ))  do sdi
+#        for sdi ∈ subdomains( res )
             values(res , sdi) .= DA_lu[sdi]\ values(x , sdi)
         end
         return res

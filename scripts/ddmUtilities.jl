@@ -1,3 +1,8 @@
+
+
+const MyDict{K,V} = ThreadSafeDict{K,V}
+
+
 """
 intersectalamatlab( a , b )
 

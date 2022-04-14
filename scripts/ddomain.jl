@@ -1,4 +1,3 @@
-
 #################################################
 #
 #       struct Domain
@@ -38,7 +37,7 @@ mutable struct DDomain
     # sd --> (subdomain_vois --> vecteur ( k_loc , k_vois ))
     DDomain(up::Domain, subdomains::Set{Domain}) = (
         res_overlaps = Dict{Domain,Dict{Domain,Tuple{Vector{Int64},Vector{Int64}}}}();
-        for sdi ∈ subdomains # algo en N^2 faire mieux avec des boundinng box (mais lesquelles?)
+        for sdi ∈ subdomains # algo en N^2 faire mieux avec des boundinng box (exemple: index_min,index_max )
             res_overlaps[sdi] = (Dict{Domain,Tuple{Vector{Int64},Vector{Int64}}})()
             for sdj ∈ subdomains
                 if (sdi !== sdj)
@@ -55,7 +54,7 @@ mutable struct DDomain
 end
 
 # pour eviter le N^2,
-    # l'intersection est symétrique !!!
+    # l'intersection est symétrique !!!--> /2
     # accélérer le ci dessus avec une boudning box basée sur le min et max des indices
     # plus imbriquer les choses via par exemple l'algorithme d'inflation (cf. matrice adjacence)
     # ne parcourir que les points ajoutés à un sous domaine (N^2 reste mais moins de taches par couple de sous domaines)

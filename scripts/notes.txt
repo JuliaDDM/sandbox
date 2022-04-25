@@ -1,0 +1,147 @@
+Julia DDM domain 
+
+Pierre Fortin: programmation par tâches parallèles et : les plus: plus facile à écrire,  composable, évite la surcharge des processeurs avec trop de threads ,    // en Julia reduce en Julia :  squelettes de programmation 
+lien de Pierre Fortin :  https://www.youtube.com/watch?v=FzhipiZO4Jk
+async = has been 
+spawn 
+BLAS en Julia 
+
+Questions pour le distribué 
+
+
+@threads == statique 
+@spawn == répartition dynamique 
+
+Parallel memory allocation ; what happens?? memory race ?? 
+
+2021-09-10
+Tomas 
+point sur son parallélisme en Julia 
+@sync begin
+  @spwan 
+  @spawn
+end
+openblas is good 
+showcase with Stefan problem in 3D 
+
+
+What about se brancher sur HPDDM?? Multigrille?? 
+Benchmark with HPDDM 
+Réponse de Pierre Jolivet:
+"je commence à apprendre le langage Julia. Je travaille aussi avec des mécaniciens qui ont un code Julia et aimeraient tester des méthodes de décomposition de domaine en Julia. D’où ma question: penses tu qu’il soit possible d’interfacer HPDDM à Julia comme ce qui existe pour Python? 
+
+Je pense que c’est faisable. J’ai fait quelques recherches Google, a priori, faire interopérer du C++ (non trivial) et Julia ne semble pas évident (mais je n’y connais rien, donc ma vision est peut être erronée).
+Par contre, ça parait plus facile de se raccrocher à du code C.
+Donc je pense que le plus simple serait de rajouter une petite surcouche au dessus de l’interface C de HPDDM."
+
+
+2021-10-01
+Pierre Jolivet ->  Interface fichiers de HPDDM??? 
+
+
+CANDIDATS:
+Toufik Boubehziz -> pas de compétence en parallélisme  mais bon profil de numéricien 
+Attendre le retour du : 
+candidat local (Pologne) Vojtek    -> 
+avant de traiter Toufik Boubehziz
+
+Faire passer le CV 
+
+2021-10-07 
+Pierre F. aux manettes 
+boucle sur les sous domaines first 
+
+@threads
+@spwan
+@ThreadsX
+
+
+############### WESTGRID
+DistributedArrays is well established	
+
+Each worker can read any elements using their global indices
+Each worker can write only to the part that it owns  ⇒  automatic parallelism and safe execution
+
+
+spawn at any: --> le fil d'exécution qui est disponible 
+Dagger.jl ++++
+
+######################################
+
+
+
+2021-11-08
+parallèlisation du produit matrice vecteur , page 225 ; précalculer les R_i A R_j^T D_j avec un dictionnaire indexé un couple de sous domaines, 
+parallel i \in 
+   seq. j 
+       mat-avec avec BLAS si dense ou ???? si creux
+   end
+end
+    
+
+/!\ shared arrays de Julia est en fait distribué ; 
+
+
+########################################################
+On a des sous domaines qui sont définis par des degrés de liberté relatifs à ???
+
+Puis on des sous-domaines qui sont une union de sous-domaines. Relativement à cette union, on peut définir les POU, Update, Shared_vector et autres
+matvec(matrix, domain) /!\ à la numérotation. 
+
+Pierre-Henri -> centrer autour des opérateurs qui vont d'un domaine à un autre, les décompositions en sous domaines suivent, 
+
+
+Vincent -> PETSC : global arrays / local arrays 
+https://hpc.pnl.gov/globalarrays/petsc.shtml
+
+Pas de librairie parallèle en PETSc
+Algorithme: blocs diagonaux en // puis les "petits points" en séquentiel car minoritaires donc pas pénalisants 
+
+
+update( false avec erreur d'arrondi) suivi de update Boolean ( true ) <=> indépendant de roundoff errors 
+
+2022-03-23
+avance sur les solveurs de Vincent
+Frédéric 
+1) rendre le test relatif 
+2) test de précision en renumérotant artificiellement en séquentiel 
+3) question de Pierre comment je garantis l'ordre alors que Dict????
+
+
+Liens externes : 
+https://live.juliacon.org/talk/E7HKVW
+3.6x speedup on A64FX by squeezing ShallowWaters.jl into Float16
+Vincent Le Chenadec à Tout le monde (10:05)
+https://github.com/milankl/Sherlogs.jl 
+http://promise.lip6.fr/
+
+
+Floops peut être appelé avec une gestion dynamique des tâches et pas seulement statique 
+
+Question : quel est le solveur direct derrière factorize.jl  
+
+Question: que fait réellement ThreadSafeDict cf. ligne 153 du fichier doctor.jl 
+Qui est louché en fait? la valeur pour une clé donnée?? 
+
+2022-04-25
+const MyDict{K,V} = ThreadSafeDict{K,V} fait et marche sans problème. 
+
+A FAIRE 
+	brancher Krylov par ordre de préférence : 
+		https://github.com/SciML/LinearSolve.jl
+		https://github.com/JuliaLinearAlgebra/IterativeSolvers.jl
+		https://github.com/JuliaSmoothOptimizers/Krylov.jl
+		https://jutho.github.io/KrylovKit.jl/stable/
+
+https://github.com/JuliaInv/KrylovMethods.jl 
+
+
+A FAIRE pour éviter la lenteur de création initiale des zones de recouvrement:
+# pour eviter le N^2,
+    # l'intersection est symétrique !!!--> /2
+    # accélérer le ci dessus avec une bounding box basée sur le min et max des indices
+    # plus imbriquer les choses via par exemple l'algorithme d'inflation (cf. matrice adjacence)
+    # ne parcourir que les points ajoutés à un sous domaine (N^2 reste mais moins de taches par couple de sous domaines)
+
+A FAIRE: Documenter le principe des fonctions "sensibles" :
+	function Diboolean(domain::DDomain)

@@ -83,9 +83,9 @@ function Laplacian2d(Nx, Ny, Lx, Ly)
     return kron(spdiagm(0 => ones(Ny)), Ax) + kron(Ay, spdiagm(0 => ones(Nx)))
 end
 
- m = 100
- n = 40
- npart = 8
+ m = 1000
+ n = 400
+ npart = 128
 
 
 # A = spdiagm(-1 => -ones(m - 1), 0 => 2.0 * ones(m), 1 => -ones(m - 1))
@@ -104,6 +104,8 @@ DomDecPartition = create_partition_DDomain(Omega, g, npart)
 SetSubdomains = Set{Domain}()# createurs pas tops
 
 map(indic -> push!(SetSubdomains, Domain(Omega, indic)), inflated_indices)
+
+
 
 my_very_first_DDomain = DDomain(Omega, SetSubdomains)
 

@@ -1,3 +1,5 @@
+
+
 #################################################
 #
 #       struct DVector
@@ -118,6 +120,7 @@ MakeCoherent( dvector )
 
 Returns a coherent decomposed vector
 Using a Boolean partition of unity ensures that the result is roundoff error free and execution order independent
+R_i ∑_j R_j^T D_j U_j
 # Argument
 - dvector : a decomposed vector
 """
@@ -149,7 +152,7 @@ function DVector2Vector(DVect::DVector)
     res = zeros(Float64, length(ddomain.up))
     #peu compatible avec une parallelisation
     #il faudrait differencier selon que Diboolean est zero ou non
-    # si je mets ThreadSafeDict ici, j'ai une erreur à l'execution. => strange ??
+    # si je mets ThreadSafeDict ici (c.a.d.????), j'ai une erreur à l'execution. => strange ??
     for (sd, val) ∈ Dres.data
         res[global_indices(sd)] .= val
     end

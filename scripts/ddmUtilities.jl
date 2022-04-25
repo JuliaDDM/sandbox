@@ -1,6 +1,7 @@
 
 
 const MyDict{K,V} = ThreadSafeDict{K,V}
+#const MyDict{K,V} = Dict{K,V}  # ERROR: LoadError: TaskFailedException Stacktrace: [1] wait @ ./task.jl:334 [inlined]
 
 
 """

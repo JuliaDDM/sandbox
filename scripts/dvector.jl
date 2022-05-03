@@ -233,11 +233,11 @@ function Dibooleannaive(domain::DDomain)
 end
 
 # premiere version
-function memoize(f)
+function my_memoize(f)
     mem = Dict()
     function memf(x)
         if x ∈ keys(mem)
-            println("I know you")
+#            println("I know you")
             return mem[x]
         end
         mem[x] = f(x)
@@ -246,7 +246,7 @@ function memoize(f)
     return memf
 end
 
-Diboolean = memoize(Dibooleannaive)
+Diboolean = my_memoize(Dibooleannaive)
 
 
 function vuesur(U::DVector)

@@ -57,7 +57,7 @@ end
 mutable struct DPOU
     Ddomain::DDomain
     #  constructeur(DDomain,options)
-    #  DPOU(DDomain) renvoie le vecteur des poids sur le domaine en question
+    #  Di() renvoie le vecteur des poids sur le domaine en question
 end
 #RAS: constructeur(DDomain, A , POU) , la POU est associée à un algorithme plus qu'à une décomposition si argument POU absent, on prend les Di implicite à ???
 
@@ -83,9 +83,9 @@ function Laplacian2d(Nx, Ny, Lx, Ly)
     return kron(spdiagm(0 => ones(Ny)), Ax) + kron(Ay, spdiagm(0 => ones(Nx)))
 end
 
- m = 1000
- n = 400
- npart = 128
+ m = 100
+ n = 40
+ npart = 8
 
 
 # A = spdiagm(-1 => -ones(m - 1), 0 => 2.0 * ones(m), 1 => -ones(m - 1))
@@ -146,6 +146,16 @@ DA = DOperator(my_very_first_DDomain , A)
 DAseq = DOperatorSequential(my_very_first_DDomain , A)
 
 DA.matvec(daaa)
+
+function MakeCoherentFromPoU(Di)
+    function MakeCoherent(DVect)
+        return Update(dot_op(Di, DVect, (.*)))
+    end
+    return MakeCoherent
+end
+MyMakeCoherent = MakeCoherentFromPoU(Diboolean(my_very_first_DDomain))
+MyMakeCoherent(daaa)
+
 
 function test_mat_vec( A , v , domain )
     Dv = DVector(domain,v)

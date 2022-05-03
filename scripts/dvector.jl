@@ -12,7 +12,7 @@ mutable struct DVector{T}
     # + , - , a* , .* , similar etc ... si on peut automatiquement hériter de ce qui vient de vecteur, on a gagné voir comment faire en Julia
     # boucles sur eval ??
     # ce qui est lié à l'aspect cohérent : prodscal et donc demande une partition de l'unite qulle quelle soit
-    # relation avec les vecteurs "habituels" : import_from_global(!) , export_to_global(!)
+    # relation avec les vecteurs "habituels" : DVector2Vector
 end
 
 function subdomains(DVect::DVector)
@@ -126,8 +126,28 @@ R_i ∑_j R_j^T D_j U_j
 """
 function MakeCoherent(DVect::DVector)
     #Diboolean ensures that the result is roundoff error free
-    return Update(dot_op(Diboolean(DVect.domain), DVect, (.*)))
+#    return Update(dot_op(Diboolean(DVect.domain), DVect, (.*)))
+    Di = Diboolean(DVect.domain)
+    return MakeCoherent(DVect,Di)
 end
+
+
+"""
+MakeCoherent( dvector , Di )
+
+Returns a coherent decomposed vector
+R_i ∑_j R_j^T D_j U_j
+# Argument
+- dvector : a decomposed vector
+- Di      : a partition of unity vector
+"""
+function MakeCoherent(DVect::DVector , Di::DVector)
+    if !(DVect.domain == Di.domain)
+        error("Domains of both decomposed vectors must be the same")
+    end
+    return Update(dot_op(Di, DVect, (.*)))
+end
+
 
 
 # """
@@ -200,7 +220,7 @@ returns a decomposed vector that corresponds to a Boolean partition of unity fun
 # Arguments
 - 'domain' : the support domain
 """
-function Diboolean(domain::DDomain)
+function Dibooleannaive(domain::DDomain)
     res = DVector(domain, 1.0)
     vector_of_subdomains = collect(subdomains(domain))
     ThreadsX.foreach( enumerate(vector_of_subdomains) )  do (i, sd)
@@ -211,6 +231,22 @@ function Diboolean(domain::DDomain)
     end
     return res
 end
+
+# premiere version
+function memoize(f)
+    mem = Dict()
+    function memf(x)
+        if x ∈ keys(mem)
+            println("I know you")
+            return mem[x]
+        end
+        mem[x] = f(x)
+        return mem[x]
+    end
+    return memf
+end
+
+Diboolean = memoize(Dibooleannaive)
 
 
 function vuesur(U::DVector)

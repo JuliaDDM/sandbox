@@ -145,3 +145,46 @@ A FAIRE pour éviter la lenteur de création initiale des zones de recouvrement:
 
 A FAIRE: Documenter le principe des fonctions "sensibles" :
 	function Diboolean(domain::DDomain)
+
+2022-05-09
+
+Pierre => lenteur dans Update due au ThreadSafeDict
+    ajouter une fonction qui prend comme argument aussi le vecteur résultat et du coup pas d'allocation dynamique. Juste écrire le résultat vite Update!(In,Out)
+Vincent => Preallaocation 
+
+Post Doc => 	Julia (1st) , 
+		revue de code 
+		commencer par problème de Poisson ?? ANR à déposer pour post doc deux ans 
+Sujet de publication Méca flu et DDM et Julia puis A64FX si :
+	0) Poisson DDM // Mémoire partagée ==> multi niveau 
+	1) code multigrille et DDM 
+	2) Pt selle en multiphasique et DDM 
+	3) multiniveau en DDM
+
+(I) --> Multi niveau avant Juin 
+
+
+2022-05-23
+Pierre-> Update en //  gros cas entraîne très lent contourner Metis avec des grilles structurées 
+Codage réutilisant nos premiers codes (Vincent and I) 
+
+Dictionnaire en écriture non // 
+Ajouter : 
+Solution 1:
+Solution 2: Trois opérations: ajout des clés en séquentiel, utilisation des clés en //, revenir à un dictionnaire de base 
+Solution 3: passer par des vecteurs 
+
+Dictionnaire pour la création puis vecteur à l'utilisation 
+Ne pas mal s'y prendre avec Julia en testant via comparaisons avec C++, Fortran 
+
+
+
+
+
+
+
+
+
+
+
+

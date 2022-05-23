@@ -98,6 +98,15 @@ function copy(DVec::DVector)
     return res
 end
 
+import LinearAlgebra.dot
+function mydot(Da::DVector,Db::DVector)
+    res = 0
+    tmp = dot_op( Diboolean(Db.domain)  , Db , (.*) )
+# time and allocation could be saved by not creating tmp but making a dot with three vectors:
+    res = ThreadsX.sum(   dot( Da.data[sd] ,  tmp.data[sd] ) for sd ∈ subdomains(Da) )
+    return res
+end
+
 
 function dot_op(x::DVector, y::DVector, dot_op)
     if !(x.domain == y.domain)

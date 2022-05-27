@@ -17,6 +17,7 @@ include("doperator.jl")
 
 
 
+
 function DOperatorBlockJacobiThreadedTest(DDomD, A)
     DA_lu = ThreadSafeDict()
     ThreadsX.foreach(subdomains( DDomD ))  do sdi
@@ -215,6 +216,36 @@ for it in 1:itmax
 #    plot!(DVector2Vector(dsol))
 end
 
+function createZZTAZinvZT( A , Z )
+    ncolZ = length(Z)
+    ZTAZ = zeros( ncolZ , ncolZ )
+    for (j,zj) ∈ enumerate(Z)
+        Azj = A*zj
+        for (i,zi) ∈ enumerate(Z)
+            ZTAZ[i,j] = dot( zi , Azj)
+        end
+    end
+    function ZZTAZinvZT( v )
+        res = similar( v )
+        fill!(res,0.)
+        # tmp = ZT*v
+        tmp = zeros( ncolZ )
+        for (j,zj) ∈ enumerate(Z)
+            tmp[j] = dot( zj , v )
+        end
+#        tmp2 = solve( ZTAZ , tmp )
+        tmp2 = zeros( ncolZ )
+        tmp2 = ZTAZ\tmp
+#        res = Z*tmp2
+        for (j,zj) ∈ enumerate(Z)
+            res += tmp2[j] * zj
+        end
+        return res
+    end
+    return ZZTAZinvZT
+end
+
+
 if (0>1)
 @show npart
  @show @btime DOperatorBlockJacobiTest(my_very_first_DDomain , A);
@@ -251,28 +282,6 @@ end
 # SUPPRIMER les ThreadSafeDict car inutiles ou bien quand utilisés en lecture passer au Dict normaux?? ??
 ## REFAIRE le point sur les dictionnaires
 
-
-# npart = 8
-# julia> @btime DOperatorBlockJacobiTest(my_very_first_DDomain , A);
-#   895.837 ms (473 allocations: 938.20 MiB)
-#
-# julia>  @btime DOperatorBlockJacobiThreadedTest(my_very_first_DDomain , A);
-#   4.794 s (626 allocations: 938.21 MiB)
-#
-# julia> @btime DOperatorBlockJacobiThreadedTestuseless(my_very_first_DDomain , A);
-#   4.062 s (576 allocations: 938.21 MiB)
-
-
-# npart = 80
-# 912.769 ms (4700 allocations: 1.36 GiB)
-# 2.761 s (5215 allocations: 1.36 GiB)
-# 2.757 s (5118 allocations: 1.36 GiB)
-
-
-# npart = 400
-#   951.615 ms (22583 allocations: 3.55 GiB)
-#   134.000 ms (23837 allocations: 3.55 GiB)
-#   178.366 ms (23732 allocations: 3.55 GiB)
 
 noncoherentrandDVector( my_very_first_DDomain );
 

@@ -45,7 +45,7 @@ mutable struct DOperator
     DDomD::DDomain # domaine de départ décomposé
     DDomA::DDomain # domaine d'arrivée décomposé
     matvec # collection of local operators Aij = R'_i A R_j^T, i ∈ DDomA, j ∈ DDomD
-    # ou plutot le produit matrice vecteur avec un DVector qui vit sur DDomD? ??
+    # à "encapsuler" en un produit matrice vecteur avec un DVector qui vit sur DDomD? ??
 end
 
 
@@ -95,6 +95,12 @@ function DOperator(DDomD, A)
         return MakeCoherent(res)
      end
      return DOperator( DDomD , DDomD , shared_mat_vec )
+end
+
+import Base.*
+
+function (*)( A::DOperator , v)
+    return A.matvec( v)
 end
 
 

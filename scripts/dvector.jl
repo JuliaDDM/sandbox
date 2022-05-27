@@ -99,12 +99,29 @@ function copy(DVec::DVector)
 end
 
 import LinearAlgebra.dot
-function mydot(Da::DVector,Db::DVector)
+function dot(Da::DVector,Db::DVector)
     res = 0
     tmp = dot_op( Diboolean(Db.domain)  , Db , (.*) )
 # time and allocation could be saved by not creating tmp but making a dot with three vectors:
     res = ThreadsX.sum(   dot( Da.data[sd] ,  tmp.data[sd] ) for sd ∈ subdomains(Da) )
     return res
+end
+
+import Base.* , Base.fill!
+function *( a::T , x::DVector{T} )  where {T<:Number}
+    res = DVector(x.domain, 0.0)
+    ThreadsX.foreach(subdomains( res ))  do sd
+#    for sd ∈ subdomains(res)
+        res.data[sd] = a*x.data[sd]
+    end
+    return res
+end
+
+function fill!(x::DVector{T} , a::T )  where {T<:Number}
+    ThreadsX.foreach(subdomains( x ))  do sd
+#    for sd ∈ subdomains(res)
+        fill!(x.data[sd] , a)
+    end
 end
 
 
@@ -119,6 +136,12 @@ function dot_op(x::DVector, y::DVector, dot_op)
     end
     return res
 end
+
+import Base.+
+function +( x::DVector , y::DVector )
+    return dot_op( x , y , +)
+end
+
 
 # DV1 .* DV2 , iterable venant d'un abstractvector , risque de perdre le //
 # Vincent --> ou surcharger broadcast

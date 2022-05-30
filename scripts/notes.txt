@@ -178,8 +178,13 @@ Dictionnaire pour la création puis vecteur à l'utilisation
 Ne pas mal s'y prendre avec Julia en testant via comparaisons avec C++, Fortran 
 
 
+About Dictionaries:
+créer d'abord des doubles vecteurs puis en faire un dictionnaire 
+pour les boucles parallèles, passer par les vecteurs associés
 
+Bizarrerie : relancer le script deux fois de suite ne donne pas les mêmes résultas dans la boucle RAS itératif mais faire deux fois de suite la boucle RAS itératif donne les mêmes résultats. Il n'y pas de random dans cette boucle. 
 
+SOLUTION : réécrire une version sans Set ni Dictionnaire en espérant régler ce problème tout en ayant plus de parallélisme. 
 
 
 

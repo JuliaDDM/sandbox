@@ -34,6 +34,17 @@ function DVector(ddomain::DDomain, initial_value::T) where {T<:Number}
         data_res[sd] = zeros(datatype, length(global_indices(sd)))
     end
     #is actually lockfree since the value of the dictionnary have been allocated just above
+    # ne compile pas
+#    ThreadsX.foreach( values(data_res) ) do vloc
+#            vloc .= initial_value
+#        end
+
+#        tmp = collect(data_res)
+#        ThreadsX.foreach( tmp ) do loc_vec
+#            loc_vec[2] .= initial_value
+#        end
+
+
     ThreadsX.foreach( ddomain.subdomains )  do sd
         data_res[sd] .= initial_value
     end

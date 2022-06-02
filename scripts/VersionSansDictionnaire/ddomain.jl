@@ -33,18 +33,19 @@ end
 mutable struct DDomain
     up::Domain # le domaine décomposé
     subdomains::Vector{Domain} # ensemble des sous domaines
-    overlaps::Dict{Domain,Dict{Domain,Tuple{Vector{Int64},Vector{Int64}}}}
+    overlaps::Dict{Int64,Dict{Int64,Tuple{Vector{Int64},Vector{Int64}}}}
 #    overlaps::SparseMatrixCSC{Tuple{Vector{Int64},Vector{Int64}},Int64}
+# Essayer Union type(nothing,mon truc )
     # sd --> (subdomain_vois --> vecteur ( k_loc , k_vois ))
     DDomain(up::Domain, subdomains::Vector{Domain}) = (
-        res_overlaps = Dict{Domain,Dict{Domain,Tuple{Vector{Int64},Vector{Int64}}}}();
-        for ( i , sdi ) ∈ enumerate(subdomains) # algo en N^2 faire mieux avec des bounding box (exemple: index_min,index_max )
-            res_overlaps[sdi] = (Dict{Domain,Tuple{Vector{Int64},Vector{Int64}}})()
-            for ( j , sdj ) ∈ enumerate(subdomains)
+        res_overlaps = Dict{Int64,Dict{Int64,Tuple{Vector{Int64},Vector{Int64}}}}();
+        for ( i , sdi) ∈ enumerate(subdomains) # algo en N^2 faire mieux avec des bounding box (exemple: index_min,index_max )
+            res_overlaps[i] = (Dict{Int64,Tuple{Vector{Int64},Vector{Int64}}})()
+            for ( j , sdj) ∈ enumerate(subdomains)
                 if (sdi !== sdj)
                     (sdisdj, kloc, kvois) = intersectalamatlab(global_indices(sdi), global_indices(sdj))
                     if (!isempty(sdisdj))
-                        res_overlaps[sdi][sdj] = (kloc, kvois)
+                        res_overlaps[i][j] = (kloc, kvois)
                     end
                 end
             end
@@ -62,4 +63,9 @@ end
 
 function subdomains(domain::DDomain)
     return domain.subdomains
+end
+
+
+function length(ddomain::DDomain)
+    return length(ddomain.subdomains)
 end

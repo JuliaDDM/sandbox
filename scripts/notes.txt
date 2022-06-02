@@ -183,12 +183,18 @@ créer d'abord des doubles vecteurs puis en faire un dictionnaire
 pour les boucles parallèles, passer par les vecteurs associés
 
 Bizarrerie : relancer le script deux fois de suite ne donne pas les mêmes résultas dans la boucle RAS itératif mais faire deux fois de suite la boucle RAS itératif donne les mêmes résultats. Il n'y pas de random dans cette boucle. 
+De fait, même sans Algebraic linéaire, le couple (métis, dictionnaire) rend le code non reproductible au moins dans ses sorties , cf. ddomain.jl  
 
 SOLUTION : réécrire une version sans Set ni Dictionnaire en espérant régler ce problème tout en ayant plus de parallélisme. 
 
+zero à la place de Similar pour tester le bug?? , 
 
 
+Ricardo : Poisson 3D domaine non trivial (masque cut cell) , Rapport MG <-> DDM (début de la production ) , toucher à tous les aspects du sujet 
 
+Transparent comme mode de communication 
+
+Code : petites librairies , revue de code , 
 
 
 

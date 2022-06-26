@@ -44,9 +44,45 @@
 mutable struct DOperator
     DDomD::DDomain # domaine de départ décomposé
     DDomA::DDomain # domaine d'arrivée décomposé
-    matvec # collection of local operators Aij = R'_i A R_j^T, i ∈ DDomA, j ∈ DDomD
+    matvec # the matrix vector product here collection of local operators Aij = R'_i A R_j^T, i ∈ DDomA, j ∈ DDomD
     # à "encapsuler" en un produit matrice vecteur avec un DVector qui vit sur DDomD? ??
 end
+
+"""
+# Arguments
+- 'DDomD'
+- 'A' : a square matrix given by its entries
+"""
+function DOperatorwoDict(DDomD, A)
+    DA = Vector{Tuple{Domain,Domain,SparseMatrixCSC{Float64,Int64},Int64,Int64}}()
+    for ( i , sdi ) ∈ enumerate(subdomains(DDomD))
+        for ( j, sdj ) ∈ enumerate(subdomains(DDomD))
+            Aij = A[global_indices(sdi), global_indices(sdj)]
+            if !(iszero(Aij))
+                push!(DA, ( sdi , sdj , Aij , i , j )  )
+            end
+        end
+    end
+    function shared_mat_vec( x )
+        dom = x.domain
+        res = zeros(dom)
+        y = zeros(dom)
+        #Diboolean pour avoir plus de reproductibilité
+        di = Diboolean( dom )
+        # buffers to store Aij*x[j] , reallocated at each call to ensure safe parallelism
+        Aijvj = Vector{Union{Tuple{Domain,Domain,Vector,Int64,Int64},Nothing}}( nothing , length(DA) )
+        for ( i, (ddv , ddop) ) ∈  enumerate(zip( Aijvj , DA ))
+            Aijvj[i] = ( ddop[1] , ddop[2] , ddop[3] * x.data[ ddop[5] ].second , ddop[4] , ddop[5] )
+        end
+        for inc ∈ Aijvj
+            println(inc)
+            res.data[ inc[4] ][2] .+= inc[3]
+        end
+        return res
+    end
+    return DOperator( DDomD , DDomD , shared_mat_vec )
+end
+
 
 
 

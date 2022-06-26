@@ -69,16 +69,18 @@ function DOperatorwoDict(DDomD, A)
         y = zeros(dom)
         #Diboolean pour avoir plus de reproductibilité
         di = Diboolean( dom )
+        for ( yvec ,  divec , xvec ) ∈ zip( y.data , di.data , x.data )
+            yvec[2] .= divec[2] .* xvec[2]
+        end
         # buffers to store Aij*x[j] , reallocated at each call to ensure safe parallelism
         Aijvj = Vector{Union{Tuple{Domain,Domain,Vector,Int64,Int64},Nothing}}( nothing , length(DA) )
         for ( i, (ddv , ddop) ) ∈  enumerate(zip( Aijvj , DA ))
-            Aijvj[i] = ( ddop[1] , ddop[2] , ddop[3] * x.data[ ddop[5] ].second , ddop[4] , ddop[5] )
+            Aijvj[i] = ( ddop[1] , ddop[2] , ddop[3] * y.data[ ddop[5] ].second , ddop[4] , ddop[5] )
         end
         for inc ∈ Aijvj
-            println(inc)
             res.data[ inc[4] ][2] .+= inc[3]
         end
-        return res
+        return MakeCoherent(res)
     end
     return DOperator( DDomD , DDomD , shared_mat_vec )
 end

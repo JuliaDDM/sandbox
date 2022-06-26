@@ -108,7 +108,10 @@ my_very_first_Complex_DVect+my_very_first_Complex_DVect
 
 DA = DOperator(my_very_first_DDomain , A)
 
+DAwodict = DOperatorwoDict(my_very_first_DDomain , A)
+
 vuesur(DA.matvec(my_very_first_DVect))
+vuesur(DAwodict.matvec(my_very_first_DVect))
 
 DA * my_very_first_DVect
 

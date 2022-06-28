@@ -36,7 +36,7 @@ end
 
  m = 10
  n = 40
- npart = 3
+ npart = 12
 
 
 # A = spdiagm(-1 => -ones(m - 1), 0 => 2.0 * ones(m), 1 => -ones(m - 1))
@@ -108,19 +108,15 @@ my_very_first_Complex_DVect+my_very_first_Complex_DVect
 
 DA = DOperator(my_very_first_DDomain , A)
 
-DAwodict = DOperatorwoDict(my_very_first_DDomain , A)
 
+#vuesur(DA.matvec(my_very_first_DVect))
 vuesur(DA.matvec(my_very_first_DVect))
-vuesur(DAwodict.matvec(my_very_first_DVect))
-
-DA * my_very_first_DVect
 
 
 function test_mat_vec( A , v , domain )
     Dv = DVector(domain,v)
     DA = DOperator(domain , A)
-    DAwodico = DOperatorwoDict(domain , A)
-    res = max(norm(DVector2Vector(DA.matvec(Dv))-A*v)/norm(A*v), norm(DVector2Vector(DAwodico.matvec(Dv))-A*v)/norm(A*v))
+    res = norm(DVector2Vector(DA.matvec(Dv))-A*v)/norm(A*v)
     println("res $res")
     return res
 end
@@ -133,3 +129,46 @@ end
 # preconditioneur decompose
 
 Am1=DOperatorBlockJacobi(my_very_first_DDomain , A)
+####### RAS iteratif twice in a row for reproductability tests  ###################
+b = ones(length(Omega))
+@time solex=A\b
+sol = zeros(length(Omega))
+itmax = 20
+dsol = DVector(my_very_first_DDomain,sol)
+dres = zeros(my_very_first_DDomain)
+db = DVector(my_very_first_DDomain,b)
+
+for it in 1:itmax
+    global dsol , dres
+    dres = dot_op( db , DA.matvec(dsol) , (-))
+    println("Norme du vrai residu " , norm( b-A*DVector2Vector(dsol) ) , " at iteration " , it )
+    # correction
+    dcor = Am1.matvec(dres)
+    #MakeCoherent!(dcor)
+    dtmp = MakeCoherent(dcor)
+#    dsol = dot_op(dsol , dcor , (+) )
+    dsol = dot_op(dsol , dtmp , (+) )
+#    plot!(DVector2Vector(dsol))
+end
+#################################################################################@
+b = ones(length(Omega))
+@time solex=A\b
+sol = zeros(length(Omega))
+itmax = 20
+dsol = DVector(my_very_first_DDomain,sol)
+dres = zeros(my_very_first_DDomain)
+db = DVector(my_very_first_DDomain,b)
+
+for it in 1:itmax
+    global dsol , dres
+    dres = dot_op( db , DA.matvec(dsol) , (-))
+    println("Norme du vrai residu deuxieme run " , norm( b-A*DVector2Vector(dsol) ) , " at iteration " , it )
+    # correction
+    dcor = Am1.matvec(dres)
+    #MakeCoherent!(dcor)
+    dtmp = MakeCoherent(dcor)
+#    dsol = dot_op(dsol , dcor , (+) )
+    dsol = dot_op(dsol , dtmp , (+) )
+#    plot!(DVector2Vector(dsol))
+end
+#################################################################################@

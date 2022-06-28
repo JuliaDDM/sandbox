@@ -44,7 +44,11 @@ end
 
 
 """
-returns a decomposed vector R_i ∑_j R_j^T U_j
+Update(U)
+
+returns the decomposed vector R_i ∑_j R_j^T U_j
+# Arguments
+- 'U' : a decomposed vector
 """
 function Update(DVec::DVector)
     res = DVector(DVec.domain, 0.0)

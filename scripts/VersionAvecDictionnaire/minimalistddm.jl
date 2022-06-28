@@ -194,7 +194,7 @@ Am1=DOperatorBlockJacobi(my_very_first_DDomain , A)
 #Am1.matvec(daaa)
 
 
-####### RAS iteratif  ###################
+####### RAS iteratif twice in a row for reproductability tests  ###################
 b = ones(length(Omega))
 @time solex=A\b
 sol = zeros(length(Omega))

@@ -229,3 +229,40 @@ function DOperatorBlockJacobi(DDomD, A)
     end
     return DOperatorBlockJacobi( DDomD , DDomD , shared_mat_vec )
 end
+
+
+"""
+DOperatorBlockJacobi(DDomD, A)
+
+Returns direct local solvers for the Dirichlet matrices of a global matrix A
+# Arguments
+- 'DDomD'
+- 'A' : a square matrix given by its entries
+"""
+function DOperatorBlockJacobiwodDict(DDomD, A)
+    # DA_lu = ThreadSafeDict()
+    # ThreadsX.foreach(subdomains( DDomD ))  do sdi
+    #     #        for sdi ∈ subdomains(DDomD)
+    #     DA_lu[sdi] = factorize(A[global_indices(sdi), global_indices(sdi)]  )
+    # end
+
+#    DA_lu = Dict()
+    DA_lu = Vector{Union{typeof(factorize(A)),Nothing}}(nothing,length(DDomD))
+
+#    ThreadsX.foreach(subdomains( DDomD ))  do sdi
+#    for sdi ∈ subdomains(DDomD)
+        DA_lu[sdi] = factorize(A[global_indices(sdi), global_indices(sdi)]  )
+    end
+
+    function shared_mat_vec( x )
+        dom = x.domain
+        res = DVector( dom , 0. )
+        # boucle parallelisable , Di a ajouter somewhere
+        ThreadsX.foreach( subdomains( res ))  do sdi
+#        for sdi ∈ subdomains( res )
+            values(res , sdi) .= DA_lu[sdi]\ values(x , sdi)
+        end
+        return res
+    end
+    return DOperatorBlockJacobi( DDomD , DDomD , shared_mat_vec )
+end

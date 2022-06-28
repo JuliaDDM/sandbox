@@ -39,10 +39,10 @@ end
  npart = 3
 
 
- A = spdiagm(-1 => -ones(m - 1), 0 => 2.0 * ones(m), 1 => -ones(m - 1))
- Omega = Domain(1:m)
-#A = Laplacian2d(m, n, 1, 1);
-#Omega = Domain(1:m*n)
+# A = spdiagm(-1 => -ones(m - 1), 0 => 2.0 * ones(m), 1 => -ones(m - 1))
+# Omega = Domain(1:m)
+A = Laplacian2d(m, n, 1, 1);
+Omega = Domain(1:m*n)
 
 g = Graph(A)
 (initial_partition, decomposition) = create_partition(g, npart)
@@ -119,10 +119,15 @@ DA * my_very_first_DVect
 function test_mat_vec( A , v , domain )
     Dv = DVector(domain,v)
     DA = DOperator(domain , A)
-    norm(DVector2Vector(DA.matvec(Dv))-A*v)/norm(A*v)
+    DAwodico = DOperatorwoDict(domain , A)
+    res = max(norm(DVector2Vector(DA.matvec(Dv))-A*v)/norm(A*v), norm(DVector2Vector(DAwodico.matvec(Dv))-A*v)/norm(A*v))
+    println("res $res")
+    return res
 end
 
-@test norm(test_mat_vec(A,rand(length(my_very_first_DDomain.up)),my_very_first_DDomain)) < 1.e-6
+
+
+@test test_mat_vec(A,rand(length(my_very_first_DDomain.up)),my_very_first_DDomain) < 1.e-6
 
 
 # preconditioneur decompose

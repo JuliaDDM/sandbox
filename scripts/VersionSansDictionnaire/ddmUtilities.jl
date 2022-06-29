@@ -1,4 +1,5 @@
 
+
 """
 intersectalamatlab( a , b )
 
@@ -31,3 +32,7 @@ function intersectalamatlab(a, b)
 
     return (ab, resa, resb)
 end
+
+
+const MyDict{K,V} = ThreadSafeDict{K,V}
+#  const MyDict{K,V} = Dict{K,V}

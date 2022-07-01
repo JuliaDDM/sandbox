@@ -153,7 +153,7 @@ Returns direct local solvers for the Dirichlet matrices of a global matrix A
 - 'A' : a square matrix given by its entries
 """
 function DOperatorBlockJacobi(DDomD, A)
-    woDA_lu = Vector{Union{typeof(factorize(A)),Nothing}}( nothing , length(DDomD) )
+    woDA_lu = Vector{typeof(factorize(A))}( undef , length(DDomD) )
     ThreadsX.foreach( enumerate(subdomains(DDomD)) ) do ( i , sdi )
     #for ( i , sdi )  ∈ enumerate(subdomains(DDomD))
         woDA_lu[i] = factorize(A[global_indices(sdi), global_indices(sdi)]  )

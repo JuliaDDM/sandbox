@@ -152,23 +152,21 @@ for it in 1:itmax
 end
 #################################################################################@
 b = ones(length(Omega))
-@time solex=A\b
+@time solex=A\b;
 sol = zeros(length(Omega))
 itmax = 20
 dsol = DVector(my_very_first_DDomain,sol)
 dres = zeros(my_very_first_DDomain)
 db = DVector(my_very_first_DDomain,b)
-
 for it in 1:itmax
     global dsol , dres
     dres = dot_op( db , DA.matvec(dsol) , (-))
-    println("Norme du vrai residu deuxieme run " , norm( b-A*DVector2Vector(dsol) ) , " at iteration " , it )
     # correction
     dcor = Am1.matvec(dres)
     #MakeCoherent!(dcor)
     dtmp = MakeCoherent(dcor)
 #    dsol = dot_op(dsol , dcor , (+) )
     dsol = dot_op(dsol , dtmp , (+) )
+    println("Norme du vrai residu  " , norm( b-A*DVector2Vector(dsol) ) , " at iteration " , it )
 #    plot!(DVector2Vector(dsol))
 end
-#################################################################################@

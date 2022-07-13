@@ -239,7 +239,8 @@ end
 #################################################################################@
 
 
-
+#  Z (Z^T A Z)^-1 Z^T  * rhs
+# Z = [ (R_i^T D_i Z_i) ]
 
 function createZZTAZinvZT( A , Z )
     ncolZ = length(Z)

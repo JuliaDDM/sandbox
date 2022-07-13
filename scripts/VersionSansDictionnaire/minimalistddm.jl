@@ -6,6 +6,8 @@
 #################################################
 using SparseArrays, LightGraphs, GraphPlot, Plots , Metis, LinearAlgebra, ThreadsX, Test,  FLoops , ThreadSafeDicts , BenchmarkTools
 
+# Why ThreadsX : dynamic load balancing, task based and not thread based => composability w.r.t. to nested parallelism (Pierre)
+
 include("ddmUtilities.jl")
 include("decomposition.jl")
 include("ddomain.jl")
@@ -127,46 +129,30 @@ end
 
 
 # preconditioneur decompose
-
+# chronometrable
 Am1=DOperatorBlockJacobi(my_very_first_DDomain , A)
-####### RAS iteratif twice in a row for reproductability tests  ###################
-b = ones(length(Omega))
-@time solex=A\b
-sol = zeros(length(Omega))
-itmax = 20
-dsol = DVector(my_very_first_DDomain,sol)
-dres = zeros(my_very_first_DDomain)
-db = DVector(my_very_first_DDomain,b)
-
-for it in 1:itmax
-    global dsol , dres
-    dres = dot_op( db , DA.matvec(dsol) , (-))
-    println("Norme du vrai residu " , norm( b-A*DVector2Vector(dsol) ) , " at iteration " , it )
-    # correction
-    dcor = Am1.matvec(dres)
-    #MakeCoherent!(dcor)
-    dtmp = MakeCoherent(dcor)
-#    dsol = dot_op(dsol , dcor , (+) )
-    dsol = dot_op(dsol , dtmp , (+) )
-#    plot!(DVector2Vector(dsol))
+# chronometrable
+function RASiteration( rhs , Am1 )
+    dcor = Am1.matvec(rhs)
+    res = MakeCoherent(dcor)
+    return res
 end
-#################################################################################@
-b = ones(length(Omega))
+
+####### RAS iteratif  ###################
+b = ones(length(Omega));
 @time solex=A\b;
-sol = zeros(length(Omega))
+sol = zeros(length(Omega));
 itmax = 20
-dsol = DVector(my_very_first_DDomain,sol)
-dres = zeros(my_very_first_DDomain)
-db = DVector(my_very_first_DDomain,b)
+dsol = DVector(my_very_first_DDomain,sol);
+dres = zeros(my_very_first_DDomain);
+db = DVector(my_very_first_DDomain,b);
 for it in 1:itmax
-    global dsol , dres
-    dres = dot_op( db , DA.matvec(dsol) , (-))
+    global dsol , dres;
+    dres = dot_op( db , DA.matvec(dsol) , (-));
     # correction
-    dcor = Am1.matvec(dres)
-    #MakeCoherent!(dcor)
-    dtmp = MakeCoherent(dcor)
+    dtmp = RASiteration( dres , Am1 );
 #    dsol = dot_op(dsol , dcor , (+) )
-    dsol = dot_op(dsol , dtmp , (+) )
+    dsol = dot_op(dsol , dtmp , (+) );
     println("Norme du vrai residu  " , norm( b-A*DVector2Vector(dsol) ) , " at iteration " , it )
 #    plot!(DVector2Vector(dsol))
 end

@@ -165,6 +165,7 @@ function DOperatorBlockJacobi(DDomD, A)
         #for ( i , sdi ) ∈ enumerate(subdomains(dom))
             res.data[i].second .= woDA_lu[i] \ x.data[i].second
         end
+        
         return res
     end
     return DOperatorBlockJacobi( DDomD , DDomD , shared_mat_vec )

@@ -93,6 +93,16 @@ vuesur(my_very_first_DVect+my_very_first_DVect)
 
 vuesur(DVector(my_very_first_DVect.domain , DVector2Vector(my_very_first_DVect)))
 
+mul!( my_very_first_DVect , ones(my_very_first_DDomain) , 2. )
+
+rmul!( my_very_first_DVect , 2.71 )
+
+axpy!(3. , ones(my_very_first_DDomain) , my_very_first_DVect )
+
+axpby!(3. , ones(my_very_first_DDomain) , 5. , my_very_first_DVect )
+
+norm(2. * ones(my_very_first_DDomain))
+
 
 #dvector tests with complex numbers
 #problems with partition of unity and dot_op
@@ -137,6 +147,16 @@ function RASiteration( rhs , Am1 )
     res = MakeCoherent(dcor)
     return res
 end
+
+function ASMiteration( rhs , Am1 )
+    dcor = Am1.matvec(rhs)
+    res = Update(dcor)
+    return res
+end
+
+
+
+
 
 ####### RAS iteratif  ###################
 b = ones(length(Omega));

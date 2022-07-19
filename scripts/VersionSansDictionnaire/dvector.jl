@@ -211,7 +211,9 @@ returns a decomposed vector that corresponds to a multiplicity based partition o
 """
 function Dimultiplicity(domain::DDomain)
     tmp = DVector(domain, 1.0)
-    multiplicity = Update(tmp)
+    multiplicity =
+
+    (tmp)
     res = dot_op(tmp, multiplicity, (./))
     return res
 end
@@ -264,6 +266,16 @@ function dot(Da::DVector,Db::DVector)
     return res
 end
 
+import LinearAlgebra.norm
+"""
+norm(v)
+
+compute the 2-norm of a vector
+"""
+function norm( Da::DVector)
+    return sqrt( dot( Da , Da ) )
+end
+
 
 function fill!(x::DVector{T} , a::T )  where {T<:Number}
     ThreadsX.foreach( x.data )  do sdvec
@@ -277,6 +289,51 @@ import Base.+
 function +( x::DVector , y::DVector )
     return dot_op( x , y , +)
 end
+
+
+import LinearAlgebra.mul!
+"""
+ Out of place scalar multiplication; multiply vector v with scalar α and store the result in w
+
+"""
+function mul!(w::DVector , v::DVector , α )
+    ThreadsX.foreach( zip( w.data , v.data ) ) do ( sdvec_w , sdvec_v )
+        LinearAlgebra.mul!( sdvec_w.second , sdvec_v.second , α )
+    end
+end
+
+import LinearAlgebra.rmul!
+"""
+    rmul!(v, α): in-place scalar multiplication of v with α;
+"""
+function rmul!(v::DVector , α )
+    ThreadsX.foreach( v.data ) do sdvec_v
+        LinearAlgebra.rmul!( sdvec_v.second , α )
+    end
+end
+
+import LinearAlgebra.axpy!
+"""
+    axpy!(α, v, w): store in w the result of α*v + w
+"""
+function axpy!(α, v::DVector , w::DVector )
+    ThreadsX.foreach( zip( v.data , w.data ) ) do ( sdvec_v , sdvec_w )
+        axpy!( α , sdvec_v.second , sdvec_w.second )
+    end
+end
+
+LinearAlgebra.axpby!(α, v, β, w)
+import LinearAlgebra.axpby!
+"""
+    axpby!(α, v, β, w): store in w the result of α*v + β*w
+"""
+function axpby!( α , v::DVector , β , w::DVector )
+    ThreadsX.foreach( zip( v.data , w.data ) ) do ( sdvec_v , sdvec_w )
+        axpby!( α , sdvec_v.second , β , sdvec_w.second )
+    end
+end
+
+
 
 # DV1 .* DV2 , iterable venant d'un abstractvector , risque de perdre le //
 # Vincent --> ou surcharger broadcast

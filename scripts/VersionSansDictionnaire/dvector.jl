@@ -322,7 +322,6 @@ function axpy!(α, v::DVector , w::DVector )
     end
 end
 
-LinearAlgebra.axpby!(α, v, β, w)
 import LinearAlgebra.axpby!
 """
     axpby!(α, v, β, w): store in w the result of α*v + β*w

@@ -105,12 +105,13 @@ norm(2. * ones(my_very_first_DDomain))
 
 
 #dvector tests with complex numbers
-#problems with partition of unity and dot_op
-# MethodError: no method matching dot_op(::DVector{Float64}, ::DVector{ComplexF64}, ::Base.Broadcast.BroadcastFunction{typeof(*)}) which is real and a solution must not interfere with transposition
-
 my_very_first_Complex_DVect = DVector(my_very_first_DDomain, 1. + 1.0im)
 
-my_very_first_Complex_DVect+my_very_first_Complex_DVect
+zdecvec = my_very_first_Complex_DVect+my_very_first_Complex_DVect
+
+vuesur(zdecvec)
+
+vuesur(dot_op(my_very_first_Complex_DVect, zdecvec  , (.*) ))
 
 #############################################################################
 #

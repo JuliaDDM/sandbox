@@ -196,6 +196,12 @@ Transparent comme mode de communication
 
 Code : petites librairies , revue de code , 
 
+2022-07-22
+séparer extraction des matrices et leur factorisation 
+
+Introduction to graph computing 
+https://live.juliacon.org/talk/WL9FZZ
+
 
 
 

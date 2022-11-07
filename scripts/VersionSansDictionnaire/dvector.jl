@@ -5,6 +5,7 @@
 #################################################
 mutable struct DVector{T}
     domain::DDomain
+    # pour devenir compatible avec BlockArrays.jl, il faut passer à une paire de vecteurs au lieu d'un vecteur de paires
     data::Vector{Pair{Domain,Vector{T}}}# cf. collect(Dict{Domain,Vector{T}}())
     # + , - , a* , .* , similar etc ... si on peut automatiquement hériter de ce qui vient de vecteur, on a gagné voir comment faire en Julia
     # boucles sur eval ??

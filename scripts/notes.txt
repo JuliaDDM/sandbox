@@ -203,5 +203,7 @@ Introduction to graph computing
 https://live.juliacon.org/talk/WL9FZZ
 
 
+// multigrid:
+https://en.wikipedia.org/wiki/Multigrid_method#Bramble%E2%80%93Pasciak%E2%80%93Xu_preconditioner
 
 

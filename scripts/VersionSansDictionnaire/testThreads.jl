@@ -39,7 +39,7 @@ function Laplacian2d(Nx, Ny, Lx, Ly)
 end
 
  m = 50
- n = 5  0
+ n = 50
  npart = 1000
 
 

@@ -212,9 +212,7 @@ returns a decomposed vector that corresponds to a multiplicity based partition o
 """
 function Dimultiplicity(domain::DDomain)
     tmp = DVector(domain, 1.0)
-    multiplicity =
-
-    (tmp)
+    multiplicity =Update(tmp)
     res = dot_op(tmp, multiplicity, (./))
     return res
 end

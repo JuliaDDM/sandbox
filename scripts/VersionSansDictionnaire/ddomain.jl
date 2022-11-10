@@ -31,7 +31,7 @@ end
 
 
 mutable struct DDomain
-    up::Domain # le domaine décomposé
+    up::Domain # le domaine décomposé, up aurait dû s'appeler domain 
     subdomains::Vector{Domain} # ensemble des sous domaines
     overlaps::Dict{Int64,Dict{Int64,Tuple{Vector{Int64},Vector{Int64}}}}
 #    overlaps::SparseMatrixCSC{Tuple{Vector{Int64},Vector{Int64}},Int64}

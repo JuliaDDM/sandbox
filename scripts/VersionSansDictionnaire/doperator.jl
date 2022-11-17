@@ -52,7 +52,7 @@ function DOperator(DDomD, A)
     end
     function shared_mat_vec( x )
         dom = x.domain
-        res = zeros(dom)
+        res = zeros(dom) # decomposed domain
         #y = zeros(dom)
         #Diboolean pour avoir plus de reproductibilité
         di = Diboolean( dom )
@@ -72,7 +72,7 @@ function DOperator(DDomD, A)
 # with sparse arrays
 # with sparse block matrices
 #
-        for inc ∈ Aijvj
+        for inc ∈ Aijvj # open for parallelism
             res.data[ inc[4] ][2] .+= inc[3]
         end
         return MakeCoherent(res)

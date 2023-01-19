@@ -27,9 +27,13 @@
 #################################################
 
 # pour effectuer le produit matrice vecteur V_i =  ∑_j R'_i A R_j^T D_j U_j  (V = A U)
+#  Operateur : (U_i)_{i=1,...,ND} ∈ DomainDecompose  ------> (V_j)_{j=1,...,NA} ∈ DomainDecompose
+# utilisé de deux manières à partir d'une matrcile globale A:
+#       1) représenter l'operateur A  : root(Depart) -----> root(Arrivee)
+#       2) représenter les preconditionneurs DD
 mutable struct DOperator
-    DDomD::DDomain # domaine de départ décomposé
-    DDomA::DDomain # domaine d'arrivée décomposé
+    DDomD::DDomain # domaine de départ décomposé # TD : real , complex, mixed precision ???
+    DDomA::DDomain # domaine d'arrivée décomposé# TA :real , complex, mixed precision  ???
     matvec # the matrix vector product here collection of local operators Aij = R'_i A R_j^T, i ∈ DDomA, j ∈ DDomD
     # à "encapsuler" en un produit matrice vecteur avec un DVector qui vit sur DDomD? ??
 end
@@ -38,9 +42,13 @@ end
 # Arguments
 - 'DDomD'
 - 'A' : a square matrix given by its entries
+!!! note
+    implements the matrix vector product this way:
+    R_i(DA*DU) = ∑_j (R_i A R_j^T) D_j DU_j
+
 """
 function DOperator(DDomD, A)
-    DA = Vector{Tuple{Domain,Domain,SparseMatrixCSC{Float64,Int64},Int64,Int64}}()
+    DA = Vector{Tuple{Domain,Domain,SparseMatrixCSC{Float64,Int64},Int64,Int64}}()# A_ij
     # not safe for parallelism since the vector has yet to be allocated
     for ( i , sdi ) ∈ enumerate(subdomains(DDomD))
         for ( j, sdj ) ∈ enumerate(subdomains(DDomD))
@@ -59,11 +67,11 @@ function DOperator(DDomD, A)
         #for ( yvec ,  divec , xvec ) ∈ zip( y.data , di.data , x.data )
         #    yvec[2] .= divec[2] .* xvec[2]
         #end
-        y = dot_op( di , x , (.*))
+        y = dot_op( di , x , (.*))#  x .*= di # y .= x; _somethingtodo!(y)
         # buffers to store Aij*x[j] , reallocated at each call to ensure safe parallelism
         Aijvj = Vector{Union{Tuple{Domain,Domain,Vector,Int64,Int64},Nothing}}( nothing , length(DA) )
         ThreadsX.foreach(  enumerate(zip( Aijvj , DA )) ) do ( i, (ddv , ddop) )
-    #    for ( i, (ddv , ddop) ) ∈  enumerate(zip( Aijvj , DA ))
+            #    for ( i, (ddv , ddop) ) ∈  enumerate(zip( Aijvj , DA ))
             Aijvj[i] = ( ddop[1] , ddop[2] , ddop[3] * y.data[ ddop[5] ].second , ddop[4] , ddop[5] )
         end
 # https://sparsearrays.juliasparse.org/dev/
@@ -72,10 +80,10 @@ function DOperator(DDomD, A)
 # with sparse arrays
 # with sparse block matrices
 #
-        for inc ∈ Aijvj # open for parallelism
+        for inc ∈ Aijvj # open for parallelism To be Done efficiently
             res.data[ inc[4] ][2] .+= inc[3]
         end
-        return MakeCoherent(res)
+        return MakeCoherent(res) #ensures exact coherence of the result
     end
     return DOperator( DDomD , DDomD , shared_mat_vec )
 end
